@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 10, 2025 at 03:21 AM
+-- Generation Time: Mar 13, 2025 at 04:53 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -70,7 +70,12 @@ INSERT INTO `activity_log` (`id`, `user_id`, `action`, `status`, `timestamp`) VA
 (14, 3, 'Uploaded file: Products_Report.pdf', 'success', '2025-03-08 09:11:48'),
 (15, 3, 'Uploaded file: ARC-HIVE_SYSTEM_DESIGN.docx', 'success', '2025-03-08 10:19:54'),
 (16, 3, 'Sent file: ARC-HIVE_SYSTEM_DESIGN.docx', 'success', '2025-03-08 10:56:02'),
-(17, 1, 'Uploaded file: RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', 'success', '2025-03-08 10:56:30');
+(17, 1, 'Uploaded file: RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', 'success', '2025-03-08 10:56:30'),
+(18, 1, 'Sent file: Implementation of Steganography Modified Least.pdf', 'success', '2025-03-12 05:38:11'),
+(19, 4, 'Uploaded file: S7-CHECK-LIST.docx', 'success', '2025-03-12 06:57:15'),
+(20, 4, 'Sent file: S7-CHECK-LIST.docx', 'success', '2025-03-12 07:17:38'),
+(21, 7, 'Uploaded file: 329558676_5042040422566117_1133674448594444879_n.jpg', 'success', '2025-03-13 04:43:27'),
+(22, 7, 'Sent file: 329558676_5042040422566117_1133674448594444879_n.jpg', 'success', '2025-03-13 04:43:42');
 
 -- --------------------------------------------------------
 
@@ -161,7 +166,9 @@ INSERT INTO `files` (`id`, `file_name`, `file_path`, `upload_date`, `user_id`, `
 (3, 'Laboratory Activity No 2 SWOT Analysis Template.xlsx', 'uploads/fa4fe06813cadd97_LaboratoryActivityNo2SWOTAnalysisTemplate.xlsx', '2025-03-08 06:18:36', 3, 18196, '', 'letter', 'Meeting Announcement', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL),
 (4, 'Products_Report.pdf', 'uploads/9e10d0ef23450678_Products_Report.pdf', '2025-03-08 09:11:48', 3, 7761, '', 'letter', 'Title Approval', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL),
 (5, 'ARC-HIVE_SYSTEM_DESIGN.docx', 'uploads/904a063137ff8d59_ARC-HIVE_SYSTEM_DESIGN.docx', '2025-03-08 10:19:54', 3, 163440, '', 'letter', 'Meeting Announcement', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL),
-(6, 'RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', 'uploads/fe8cf4e9f1f2edec_RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', '2025-03-08 10:56:30', 1, 1004013, '', 'letter', 'Meeting Announcement', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL);
+(6, 'RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', 'uploads/fe8cf4e9f1f2edec_RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', '2025-03-08 10:56:30', 1, 1004013, '', 'letter', 'Meeting Announcement', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL),
+(7, 'S7-CHECK-LIST.docx', 'uploads/6d49179839ac2eaa_S7-CHECK-LIST.docx', '2025-03-12 06:57:15', 4, 557985, '', 'memmo', 'Request Letter', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL),
+(8, '329558676_5042040422566117_1133674448594444879_n.jpg', 'uploads/b194727485f135fa_329558676_5042040422566117_1133674448594444879_n.jpg', '2025-03-13 04:43:27', 7, 252435, '', 'pic', 'Request Letter', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -208,7 +215,9 @@ INSERT INTO `file_recipients` (`id`, `file_id`, `recipient_id`) VALUES
 (4, 2, 1),
 (5, 2, 3),
 (6, 3, 2),
-(7, 5, 1);
+(7, 5, 1),
+(8, 2, 1),
+(9, 8, 6);
 
 -- --------------------------------------------------------
 
@@ -245,7 +254,11 @@ INSERT INTO `notifications` (`id`, `user_id`, `type`, `message`, `status`, `time
 (13, 3, 'info', 'File uploaded successfully: Products_Report.pdf', 'unread', '2025-03-08 09:11:48'),
 (14, 3, 'info', 'File uploaded successfully: ARC-HIVE_SYSTEM_DESIGN.docx', 'unread', '2025-03-08 10:19:54'),
 (15, 1, 'info', 'You have received a new file: ARC-HIVE_SYSTEM_DESIGN.docx', 'unread', '2025-03-08 10:56:02'),
-(16, 1, 'info', 'File uploaded successfully: RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', 'unread', '2025-03-08 10:56:30');
+(16, 1, 'info', 'File uploaded successfully: RIVERA-IVAN-HARVEY-FINAL-PROJECT-DOCUMENT.pdf', 'unread', '2025-03-08 10:56:30'),
+(17, 1, 'info', 'You have received a new file: Implementation of Steganography Modified Least.pdf', 'unread', '2025-03-12 05:38:11'),
+(18, 4, 'info', 'File uploaded successfully: S7-CHECK-LIST.docx', 'unread', '2025-03-12 06:57:15'),
+(19, 7, 'info', 'File uploaded successfully: 329558676_5042040422566117_1133674448594444879_n.jpg', 'unread', '2025-03-13 04:43:27'),
+(20, 6, 'info', 'You have received a new file: 329558676_5042040422566117_1133674448594444879_n.jpg', 'unread', '2025-03-13 04:43:42');
 
 -- --------------------------------------------------------
 
@@ -301,7 +314,30 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `profile_pic`, `position`, `department_id`, `created_at`) VALUES
 (1, 'admin', '$2y$10$uzCPpYzYb4pfubmI8a0F0OFwTVP6OIGcc5gmodm0SFypR.hzRdmTm', 'Ivan Harvey Rivera', 'admin', 'uploads/67cb9b8a0f125.png', 'admin', 11, '2025-03-08 01:21:14'),
 (2, 'trevor_mundo', '$2y$10$wepJ5cW2AaRyl2xmHzseL.sHt.6EvM3M93g2atjAIGNMzSbdW5hEO', 'TREVOR MUNDO', 'client', 'uploads/67cbddfd767ad.png', 'Tester', 9, '2025-03-08 01:25:24'),
-(3, 'Banjans', '$2y$10$Xn/Kv6PWbBU4yJFiRJyume0hX2DgBskIU8BDfNY//xotgaLXhnY46', 'William Banjans', 'client', 'uploads/67cbe12176733.png', 'Golden Dawn 1st Captain', 10, '2025-03-08 06:18:09');
+(3, 'Banjans', '$2y$10$Xn/Kv6PWbBU4yJFiRJyume0hX2DgBskIU8BDfNY//xotgaLXhnY46', 'William Banjans', 'client', 'uploads/67cbe12176733.png', 'Golden Dawn 1st Captain', 10, '2025-03-08 06:18:09'),
+(4, 'nissan', '$2y$10$ahW2lvp/cBTGCbvVignf0.KiNhUhYycQO.GFttWZdF4IYbNQZSi4a', 'Caleb Steven A Lagunilla', 'client', 'uploads/67d1190c28254.png', 'Programmer', 5, '2025-03-12 05:18:04'),
+(6, 'Lea', '$2y$10$oyeFKt6x6N2mW.Fb.6POje19YyFNMfnYONVi011HEsxSqpUam0wsK', 'Lea Devera Navarro', 'client', NULL, 'The General', NULL, '2025-03-12 08:43:14'),
+(7, 'Test', '$2y$10$maek.7vTFpgSzahAwdk7nuRRcxNQEAW2WGEzF5V7nCoRBZJ2V4h1S', 'Kylie Tisy', 'client', 'uploads/67d2610f7dee6.png', 'Tester', 5, '2025-03-13 04:37:35');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_departments`
+--
+
+CREATE TABLE `user_departments` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `department_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_departments`
+--
+
+INSERT INTO `user_departments` (`id`, `user_id`, `department_id`) VALUES
+(3, 6, 5),
+(4, 6, 11);
 
 --
 -- Indexes for dumped tables
@@ -394,6 +430,14 @@ ALTER TABLE `users`
   ADD KEY `department_id` (`department_id`);
 
 --
+-- Indexes for table `user_departments`
+--
+ALTER TABLE `user_departments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `department_id` (`department_id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -407,7 +451,7 @@ ALTER TABLE `access_requests`
 -- AUTO_INCREMENT for table `activity_log`
 --
 ALTER TABLE `activity_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `cabinets`
@@ -425,7 +469,7 @@ ALTER TABLE `departments`
 -- AUTO_INCREMENT for table `files`
 --
 ALTER TABLE `files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `file_departments`
@@ -437,13 +481,13 @@ ALTER TABLE `file_departments`
 -- AUTO_INCREMENT for table `file_recipients`
 --
 ALTER TABLE `file_recipients`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `recently_deleted`
@@ -461,7 +505,13 @@ ALTER TABLE `storage_locations`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `user_departments`
+--
+ALTER TABLE `user_departments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Constraints for dumped tables
@@ -532,6 +582,13 @@ ALTER TABLE `storage_locations`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `user_departments`
+--
+ALTER TABLE `user_departments`
+  ADD CONSTRAINT `user_departments_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `user_departments_ibfk_2` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
