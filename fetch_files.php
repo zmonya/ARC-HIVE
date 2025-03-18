@@ -1,28 +1,18 @@
 <?php
-session_start();
 require 'db_connection.php';
 
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode([]);
-    exit();
-}
+session_start();
+$userId = $_SESSION['user_id'];
+$departmentId = $_SESSION['department_id'];
 
-$user_id = $_SESSION['user_id'];
+// Fetch files for the user's folder
+$stmt = $pdo->prepare("SELECT * FROM files WHERE user_id = ?");
+$stmt->execute([$userId]);
+$files = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch files for the logged-in user
-$sql = "SELECT file_name FROM files WHERE user_id = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
+// Fetch files for the department folder
+$stmt = $pdo->prepare("SELECT * FROM files WHERE department_id = ?");
+$stmt->execute([$departmentId]);
+$departmentFiles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$files = [];
-while ($row = $result->fetch_assoc()) {
-    $files[] = $row['file_name'];
-}
-
-$stmt->close();
-$conn->close();
-
-echo json_encode($files);
-?>
+echo json_encode(['files' => $files, 'departmentFiles' => $departmentFiles]);
