@@ -1,43 +1,127 @@
 <?php
 session_start();
-require 'db_connection.php'; // Ensure this file initializes $pdo
+require 'db_connection.php'; // Assumes $pdo is initialized with PDO connection
 
-$error = ""; // Initialize error variable
+// Security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Sanitize and validate inputs
-    $username = trim(htmlspecialchars($_POST['username']));
-    $password = trim(htmlspecialchars($_POST['password']));
+// Initialize variables
+$error = '';
+$csrf_token = '';
 
-    if (empty($username) || empty($password)) {
-        $error = "Username and password are required.";
+// Generate CSRF token if not set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf_token = $_SESSION['csrf_token'];
+
+/**
+ * Log login attempt to transaction table
+ * @param PDO $pdo Database connection
+ * @param int $user_id User ID or null if failed
+ * @param string $status Success or Failure
+ * @param string $message Log message
+ */
+function logLoginAttempt($pdo, $user_id, $status, $message)
+{
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO transaction (User_id, Transaction_status, Transaction_type, Time, Massage)
+            VALUES (?, ?, ?, NOW(), ?)
+        ");
+        // Transaction_type: 1 for success, 2 for failure
+        $transaction_type = ($status === 'Success') ? 1 : 2;
+        $stmt->execute([$user_id, $status, $transaction_type, $message]);
+    } catch (PDOException $e) {
+        error_log("Failed to log login attempt: " . $e->getMessage(), 3, 'error_log.log');
+    }
+}
+
+/**
+ * Fetch user's department affiliations
+ * @param PDO $pdo Database connection
+ * @param int $user_id User ID
+ * @return array Department IDs
+ */
+function getUserDepartments($pdo, $user_id)
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT Department_id 
+            FROM users_department 
+            WHERE User_id = ?
+        ");
+        $stmt->execute([$user_id]);
+        return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'Department_id');
+    } catch (PDOException $e) {
+        error_log("Failed to fetch departments: " . $e->getMessage(), 3, 'error_log.log');
+        return [];
+    }
+}
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Validate CSRF token
+    $posted_csrf = filter_input(INPUT_POST, 'csrf_token', FILTER_SANITIZE_STRING) ?? '';
+    if ($posted_csrf !== $_SESSION['csrf_token']) {
+        $error = "Invalid CSRF token.";
+        logLoginAttempt($pdo, null, 'Failure', 'Invalid CSRF token for username: ' . ($_POST['username'] ?? 'unknown'));
     } else {
-        // Fetch user from the database
-        $sql = "SELECT id, username, password, full_name, position, department_id, role FROM users WHERE username = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$username]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        // Sanitize and validate inputs
+        $username = trim(filter_input(INPUT_POST, 'username', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+        $password = trim(filter_input(INPUT_POST, 'password', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
 
-        if ($user && password_verify($password, $user['password'])) {
-            // Regenerate session ID for security
-            session_regenerate_id(true);
-
-            // Set session variables
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['position'] = $user['position'];
-            $_SESSION['department_id'] = $user['department_id'];
-            $_SESSION['role'] = $user['role'];
-
-            // Redirect to the dashboard
-            header("Location: index.php");
-            exit();
+        if (empty($username) || empty($password)) {
+            $error = "Username and password are required.";
+            logLoginAttempt($pdo, null, 'Failure', 'Empty username or password');
         } else {
-            $error = "Invalid username or password.";
+            try {
+                // Fetch user from database
+                $stmt = $pdo->prepare("
+                    SELECT User_id, Username, Password, Role, Position 
+                    FROM users 
+                    WHERE Username = ?
+                ");
+                $stmt->execute([$username]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($user && password_verify($password, $user['Password'])) {
+                    // Regenerate session ID for security
+                    session_regenerate_id(true);
+
+                    // Set session variables
+                    $_SESSION['user_id'] = $user['User_id'];
+                    $_SESSION['username'] = $user['Username'];
+                    $_SESSION['role'] = $user['Role'];
+                    $_SESSION['position'] = $user['Position'];
+                    $_SESSION['departments'] = getUserDepartments($pdo, $user['User_id']);
+                    // No sub_departments table in schema, set as empty
+                    $_SESSION['sub_departments'] = [];
+
+                    // Log successful login
+                    logLoginAttempt($pdo, $user['User_id'], 'Success', 'User logged in successfully');
+
+                    // Redirect based on role
+                    $redirect = ($user['Role'] === 'admin') ? 'admin_dashboard.php' : 'Dashboard.php';
+                    header("Location: $redirect");
+                    exit();
+                } else {
+                    $error = "Invalid username or password.";
+                    logLoginAttempt($pdo, null, 'Failure', "Invalid login attempt for username: $username");
+                }
+            } catch (PDOException $e) {
+                error_log("Database error: " . $e->getMessage(), 3, 'error_log.log');
+                $error = "An error occurred. Please try again later.";
+            }
         }
     }
 }
+
+// Disable error display in production
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL);
 ?>
 
 <!DOCTYPE html>
@@ -50,7 +134,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Global Styles */
         body {
             font-family: 'Montserrat', Arial, sans-serif;
             background-color: #f4f7f9;
@@ -62,7 +145,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             height: 100vh;
         }
 
-        /* Login Container */
         .login-container {
             background: white;
             padding: 30px;
@@ -84,6 +166,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border: 1px solid #ccc;
             border-radius: 6px;
             font-size: 14px;
+            box-sizing: border-box;
         }
 
         .login-container button {
@@ -128,15 +211,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
     <div class="login-container">
         <h2>Login</h2>
-        <?php if (isset($error)): ?>
-            <p class="error"><?php echo $error; ?></p>
+        <?php if (!empty($error)): ?>
+            <p class="error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
         <form action="login.php" method="POST">
-            <input type="text" name="username" placeholder="Username" required>
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" name="username" placeholder="Username" value="<?php echo isset($username) ? htmlspecialchars($username, ENT_QUOTES, 'UTF-8') : ''; ?>" required>
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit">Login</button>
         </form>
-        <p>Don't have an account? <a href="register.php">Register here</a></p>
     </div>
 </body>
 

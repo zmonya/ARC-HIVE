@@ -1,36 +1,4 @@
 
-/* File Types Section */
-.file-types {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.file-type-card {
-    flex: 1;
-    text-align: center;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.file-type-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-}
-
-.file-type-card i {
-    font-size: 24px;
-    color: #2c3e50;
-}
-
-.file-type-card p {
-    margin: 10px 0 0;
-    font-size: 14px;
-    color: #333;
-}
 
 /* Masonry Grid Layout */
 .masonry-grid {

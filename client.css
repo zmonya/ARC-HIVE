@@ -1,3 +1,6 @@
+
+   
+   
    /* Activity Log Styles */
    .activity-log {
     background-color: #ffffff;
@@ -192,7 +195,7 @@
     margin-bottom: 15px;
 }
 
-/* Popup Styles */
+/** Popup Styles 
 .popup-file-selection {
     position: fixed;
     top: 50%;
@@ -203,10 +206,13 @@
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
     padding: 20px;
     z-index: 1000;
-    width: 600px;
-    max-height: 80vh;
+    width: 900px; 
+    max-width: 100vw; 
+    max-height: 85vh;
     overflow-y: auto;
-}
+} 
+**/
+
 
 /* Search Bar */
 .search-container {

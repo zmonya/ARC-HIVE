@@ -62,32 +62,7 @@
     box-shadow: 0 0 10px rgba(80, 200, 120, 0.5);
 }
 
-.logout-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    color: white;
-    /* Adjust based on your background */
-    font-size: 16px;
-    font-weight: 500;
-    text-decoration: none;
-    border-radius: 6px;
-    transition: color 0.3s ease, transform 0.2s ease;
-}
 
-.logout-btn i {
-    font-size: 18px;
-    transition: color 0.3s ease;
-}
-
-.logout-btn:hover {
-    color: #3da75b;
-}
-
-.logout-btn:active {
-    transform: translateY(0);
-}
 
 /* Activity Log Icon */
 .activity-log-icon {
@@ -186,76 +161,7 @@
     color: #606770;
 }
 
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(220deg, #50c878, #34495e);
-    height: 100%;
-    padding: 20px;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-    transition: width 0.3s ease;
-}
 
-.sidebar h2 {
-    text-align: center;
-    font-size: 20px;
-    margin-bottom: 20px;
-}
-
-.sidebar .toggle-btn {
-    background-color: transparent;
-    border: none;
-    color: white;
-    cursor: pointer;
-    font-size: 24px;
-    margin-bottom: 20px;
-    transition: transform 0.2s ease;
-}
-
-.sidebar .toggle-btn:hover {
-    transform: scale(1.1);
-}
-
-.sidebar a {
-    display: flex;
-    align-items: center;
-    padding: 12px;
-    color: white;
-    text-decoration: none;
-    font-size: 16px;
-    transition: background 0.3s;
-    border-radius: 8px;
-    margin-bottom: 10px;
-}
-
-.sidebar a i {
-    margin-right: 12px;
-    width: 24px; /* Fixed width for icons */
-}
-
-.sidebar a:hover,
-.sidebar a.active {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.sidebar.minimized {
-    width: 60px; /* Minimized width */
-}
-
-.sidebar.minimized .link-text {
-    display: none; /* Hide text in minimized state */
-}
-
-.sidebar.minimized a {
-    justify-content: center; /* Center icons when minimized */
-}
-
-.sidebar.minimized a i {
-    margin-right: 0; /* Remove margin for icons */
-}
 
 /* Main Content */
 .main-content {
@@ -635,22 +541,20 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: #ffffff;
-    width: 450px;
-    padding: 30px; /* Slightly increased padding for spaciousness */
-    border-radius: 12px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-    text-align: center;
-    display: none;
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     z-index: 1000;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
-/* Header */
 .popup-questionnaire h3 {
-    color: #2c3e50;
-    font-size: 24px; /* Increased font size for prominence */
-    font-weight: 600;
-    margin-bottom: 20px;
+    margin-top: 0;
+    color: #333;
 }
 
 /* Form Elements */
@@ -660,23 +564,20 @@ body {
 
 .popup-questionnaire label {
     display: block;
-    font-weight: 600;
-    color: #2c3e50; /* Dark color for text */
-    margin-top: 15px; /* Spacing above labels */
-    font-size: 16px; /* Larger font size for readability */
+    margin: 10px 0 5px;
+    font-weight: 500;
 }
 
 /* Input and Select Styles */
+
+.popup-questionnaire input,
 .popup-questionnaire select,
-.popup-questionnaire input {
-    width: 100%; /* Full width */
-    padding: 12px; /* Comfortable padding */
-    border: 1px solid #d1d5db; /* Light border */
-    border-radius: 8px; /* Rounded corners */
-    font-size: 16px; /* Larger font size */
-    background: #f8fafc; /* Light background */
-    transition: border 0.3s ease-in-out; /* Smooth transition */
-    margin-top: 8px; /* Spacing above inputs */
+.popup-questionnaire textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
 }
 
 /* Focus state for input and select */
