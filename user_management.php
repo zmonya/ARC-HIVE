@@ -1,3 +1,14 @@
+
+/**
+ * Helper function to get a valid File_id for transaction logs
+ * @param PDO $pdo
+ * @return int
+ */
+function getDefaultFileId(PDO $pdo): int {
+    $stmt = $pdo->query("SELECT file_id FROM files ORDER BY file_id ASC LIMIT 1");
+    $fileId = $stmt->fetchColumn();
+    return $fileId ? (int)$fileId : 1; // fallback to 1 if no files exist
+}
 <?php
 session_start();
 require 'db_connection.php'; // Assumes $pdo is initialized with PDO connection
@@ -20,6 +31,14 @@ error_reporting(E_ALL);
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
+
+
+// Helper function to get a valid File_id for transaction logs
+function getDefaultFileId(PDO $pdo): int {
+    $stmt = $pdo->query("SELECT file_id FROM files ORDER BY file_id ASC LIMIT 1");
+    $fileId = $stmt->fetchColumn();
+    return $fileId ? (int)$fileId : 1; // fallback to 1 if no files exist
+}
 
 /**
  * Sends a JSON response with appropriate HTTP status for AJAX requests.
@@ -50,11 +69,12 @@ function validateAdminSession(PDO $pdo): int
         // Log unauthorized access attempt
         $message = 'Unauthorized access attempt to user_management.php';
         try {
+            $fileId = getDefaultFileId($pdo);
             $stmt = $pdo->prepare("
-                INSERT INTO transaction (User_id, Transaction_status, Transaction_type, Time, Massage)
-                VALUES (?, 'failed', 22, NOW(), ?)
+                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                VALUES (?, ?, 'failed', 22, NOW(), ?)
             ");
-            $stmt->execute([$_SESSION['user_id'] ?? null, $message]);
+            $stmt->execute([$_SESSION['user_id'] ?? null, $fileId, $message]);
         } catch (PDOException $e) {
             error_log("Failed to log unauthorized access: " . $e->getMessage(), 3, __DIR__ . '/logs/error_log.log');
         }
@@ -186,11 +206,12 @@ try {
         // Verify CSRF token
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $csrfToken) {
             $message = 'Invalid CSRF token during POST request';
+            $fileId = getDefaultFileId($pdo);
             $stmt = $pdo->prepare("
-                INSERT INTO transaction (User_id, Transaction_status, Transaction_type, Time, Massage)
-                VALUES (?, 'failed', 22, NOW(), ?)
+                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                VALUES (?, ?, 'failed', 22, NOW(), ?)
             ");
-            $stmt->execute([$adminId, $message]);
+            $stmt->execute([$adminId, $fileId, $message]);
             sendJsonResponse(false, 'Invalid CSRF token.', [], 403);
         }
 
@@ -273,11 +294,12 @@ try {
                 }
 
                 // Log action in transaction table
+                $fileId = getDefaultFileId($pdo);
                 $stmt = $pdo->prepare("
-                    INSERT INTO transaction (User_id, Transaction_status, Transaction_type, Time, Massage)
-                    VALUES (?, 'completed', 22, NOW(), ?)
+                    INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                    VALUES (?, ?, 'completed', 22, NOW(), ?)
                 ");
-                $stmt->execute([$adminId, $logMessage]);
+                $stmt->execute([$adminId, $fileId, $logMessage]);
 
                 $pdo->commit();
                 sendJsonResponse(true, 'User ' . ($action === 'add' ? 'added' : 'updated') . ' successfully.', [], 200);
@@ -292,11 +314,12 @@ try {
         // Verify CSRF token for delete action
         if (!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $csrfToken) {
             $message = 'Invalid CSRF token during DELETE request';
+            $fileId = getDefaultFileId($pdo);
             $stmt = $pdo->prepare("
-                INSERT INTO transaction (User_id, Transaction_status, Transaction_type, Time, Massage)
-                VALUES (?, 'failed', 22, NOW(), ?)
+                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                VALUES (?, ?, 'failed', 22, NOW(), ?)
             ");
-            $stmt->execute([$adminId, $message]);
+            $stmt->execute([$adminId, $fileId, $message]);
             $_SESSION['error'] = 'Invalid CSRF token.';
             header('Location: login.php');
             exit;
@@ -324,11 +347,12 @@ try {
         $stmt = $pdo->prepare("DELETE FROM users WHERE User_id = ?");
         $stmt->execute([$user_id]);
 
+        $fileId = getDefaultFileId($pdo);
         $stmt = $pdo->prepare("
-            INSERT INTO transaction (User_id, Transaction_status, Transaction_type, Time, Massage)
-            VALUES (?, 'completed', 22, NOW(), ?)
+            INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+            VALUES (?, ?, 'completed', 22, NOW(), ?)
         ");
-        $stmt->execute([$adminId, "Deleted user: $username"]);
+        $stmt->execute([$adminId, $fileId, "Deleted user: $username"]);
 
         $pdo->commit();
         header('Location: user_management.php');
@@ -363,9 +387,9 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" integrity="sha512-hCAg8D0Ji4sG8M4rKEAy7kSOd0pH2j+1vV5f2jVrOjpV+LP2qF+81Tr5QUvA0D2eV2XJC+9cW9k3G4U3V0y2eA==" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="admin-sidebar.css">
-    <link rel="stylesheet" href="admin-interface.css">
-        <link rel="stylesheet" href="style/admin-interface.css">
+<!--     <link rel="stylesheet" href="admin-sidebar.css">
+    <link rel="stylesheet" href="admin-interface.css"> -->
+    <link rel="stylesheet" href="style/admin-interface.css">
     <link rel="stylesheet" href="style/admin-sidebar.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
