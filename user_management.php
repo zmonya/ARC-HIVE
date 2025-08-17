@@ -1,15 +1,26 @@
-
 /**
  * Helper function to get a valid File_id for transaction logs
  * @param PDO $pdo
  * @return int
  */
-function getDefaultFileId(PDO $pdo): int {
+function getDefaultFileId(PDO $pdo): ?int {
     $stmt = $pdo->query("SELECT file_id FROM files ORDER BY file_id ASC LIMIT 1");
     $fileId = $stmt->fetchColumn();
-    return $fileId ? (int)$fileId : 1; // fallback to 1 if no files exist
+    return $fileId ? (int)$fileId : null; // return null if no files exist
 }
+
 <?php
+/**
+ * Helper function to get a valid File_id for transaction logs
+ * @param PDO $pdo
+ * @return int
+ */
+function getDefaultFileId(PDO $pdo): ?int {
+    $stmt = $pdo->query("SELECT file_id FROM files ORDER BY file_id ASC LIMIT 1");
+    $fileId = $stmt->fetchColumn();
+    return $fileId !== false ? (int)$fileId : null; // return null if no files exist
+}
+
 session_start();
 require 'db_connection.php'; // Assumes $pdo is initialized with PDO connection
 require 'log_activity.php'; // Assumes logging function for transaction table
@@ -31,14 +42,6 @@ error_reporting(E_ALL);
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
-
-
-// Helper function to get a valid File_id for transaction logs
-function getDefaultFileId(PDO $pdo): int {
-    $stmt = $pdo->query("SELECT file_id FROM files ORDER BY file_id ASC LIMIT 1");
-    $fileId = $stmt->fetchColumn();
-    return $fileId ? (int)$fileId : 1; // fallback to 1 if no files exist
-}
 
 /**
  * Sends a JSON response with appropriate HTTP status for AJAX requests.
@@ -70,11 +73,13 @@ function validateAdminSession(PDO $pdo): int
         $message = 'Unauthorized access attempt to user_management.php';
         try {
             $fileId = getDefaultFileId($pdo);
-            $stmt = $pdo->prepare("
-                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
-                VALUES (?, ?, 'failed', 22, NOW(), ?)
-            ");
-            $stmt->execute([$_SESSION['user_id'] ?? null, $fileId, $message]);
+            if ($fileId !== null) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                    VALUES (?, ?, 'failed', 22, NOW(), ?)
+                ");
+                $stmt->execute([$_SESSION['user_id'] ?? null, $fileId, $message]);
+            }
         } catch (PDOException $e) {
             error_log("Failed to log unauthorized access: " . $e->getMessage(), 3, __DIR__ . '/logs/error_log.log');
         }
@@ -207,11 +212,13 @@ try {
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $csrfToken) {
             $message = 'Invalid CSRF token during POST request';
             $fileId = getDefaultFileId($pdo);
-            $stmt = $pdo->prepare("
-                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
-                VALUES (?, ?, 'failed', 22, NOW(), ?)
-            ");
-            $stmt->execute([$adminId, $fileId, $message]);
+            if ($fileId !== null) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                    VALUES (?, ?, 'failed', 22, NOW(), ?)
+                ");
+                $stmt->execute([$adminId, $fileId, $message]);
+            }
             sendJsonResponse(false, 'Invalid CSRF token.', [], 403);
         }
 
@@ -293,13 +300,15 @@ try {
                     $stmt->execute([$user_id, $dept_id]);
                 }
 
-                // Log action in transaction table
+                // Log action in transaction table - use valid file_id
                 $fileId = getDefaultFileId($pdo);
-                $stmt = $pdo->prepare("
-                    INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
-                    VALUES (?, ?, 'completed', 22, NOW(), ?)
-                ");
-                $stmt->execute([$adminId, $fileId, $logMessage]);
+                if ($fileId !== null) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                        VALUES (?, ?, 'completed', 22, NOW(), ?)
+                    ");
+                    $stmt->execute([$adminId, $fileId, $logMessage]);
+                }
 
                 $pdo->commit();
                 sendJsonResponse(true, 'User ' . ($action === 'add' ? 'added' : 'updated') . ' successfully.', [], 200);
@@ -315,11 +324,13 @@ try {
         if (!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $csrfToken) {
             $message = 'Invalid CSRF token during DELETE request';
             $fileId = getDefaultFileId($pdo);
-            $stmt = $pdo->prepare("
-                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
-                VALUES (?, ?, 'failed', 22, NOW(), ?)
-            ");
-            $stmt->execute([$adminId, $fileId, $message]);
+            if ($fileId !== null) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                    VALUES (?, ?, 'failed', 22, NOW(), ?)
+                ");
+                $stmt->execute([$adminId, $fileId, $message]);
+            }
             $_SESSION['error'] = 'Invalid CSRF token.';
             header('Location: login.php');
             exit;
@@ -348,11 +359,13 @@ try {
         $stmt->execute([$user_id]);
 
         $fileId = getDefaultFileId($pdo);
-        $stmt = $pdo->prepare("
-            INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
-            VALUES (?, ?, 'completed', 22, NOW(), ?)
-        ");
-        $stmt->execute([$adminId, $fileId, "Deleted user: $username"]);
+        if ($fileId !== null) {
+            $stmt = $pdo->prepare("
+                INSERT INTO transaction (User_id, File_id, Transaction_status, Transaction_type, Time, Massage)
+                VALUES (?, ?, 'completed', 22, NOW(), ?)
+            ");
+            $stmt->execute([$adminId, $fileId, "Deleted user: $username"]);
+        }
 
         $pdo->commit();
         header('Location: user_management.php');
@@ -362,11 +375,18 @@ try {
     $users = fetchAllUsers($pdo);
     $departments = fetchAllDepartments($pdo);
 } catch (Exception $e) {
-    error_log("Error in user_management.php: " . $e->getMessage(), 3, __DIR__ . '/logs/error_log.log');
+    $errorDetails = $e->getMessage() . ' (Line: ' . $e->getLine() . ')';
+    if ($e instanceof PDOException) {
+        $errorDetails .= ' | SQLSTATE: ' . $e->getCode();
+        if (method_exists($e, 'errorInfo') && $e->errorInfo) {
+            $errorDetails .= ' | errorInfo: ' . json_encode($e->errorInfo);
+        }
+    }
+    error_log("Error in user_management.php: " . $errorDetails, 3, __DIR__ . '/logs/error_log.log');
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        sendJsonResponse(false, 'Server error: ' . $e->getMessage(), [], $e->getCode() ?: 500);
+        sendJsonResponse(false, 'Server error: ' . $errorDetails, [], $e->getCode() ?: 500);
     } else {
-        $_SESSION['error'] = 'Server error: ' . $e->getMessage();
+        $_SESSION['error'] = 'Server error: ' . $errorDetails;
         header('Location: login.php');
         exit;
     }
@@ -387,8 +407,6 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" integrity="sha512-hCAg8D0Ji4sG8M4rKEAy7kSOd0pH2j+1vV5f2jVrOjpV+LP2qF+81Tr5QUvA0D2eV2XJC+9cW9k3G4U3V0y2eA==" crossorigin="anonymous" referrerpolicy="no-referrer">
-<!--     <link rel="stylesheet" href="admin-sidebar.css">
-    <link rel="stylesheet" href="admin-interface.css"> -->
     <link rel="stylesheet" href="style/admin-interface.css">
     <link rel="stylesheet" href="style/admin-sidebar.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -557,22 +575,7 @@ try {
 </head>
 
 <body>
-    <!-- <div class="sidebar">
-        <button class="toggle-btn" title="Toggle Sidebar" aria-label="Toggle Sidebar"><i class="fas fa-bars"></i></button>
-        <h2 class="sidebar-title">Admin Panel</h2>
-        <a href="dashboard.php" data-tooltip="Switch to Client View"><i class="fas fa-exchange-alt"></i><span class="link-text">Switch to Client View</span></a>
-        <a href="admin_dashboard.php" data-tooltip="Dashboard"><i class="fas fa-home"></i><span class="link-text">Dashboard</span></a>
-        <a href="admin_search.php" data-tooltip="View All Files"><i class="fas fa-search"></i><span class="link-text">View All Files</span></a>
-        <a href="user_management.php" class="active" data-tooltip="User Management"><i class="fas fa-users"></i><span class="link-text">User Managementaw</span></a>
-        <a href="department_management.php" data-tooltip="Department Management"><i class="fas fa-building"></i><span class="link-text">Department Management</span></a>
-        <a href="physical_storage_management.php" data-tooltip="Physical Storage"><i class="fas fa-archive"></i><span class="link-text">Physical Storage</span></a>
-        <a href="logout.php" class="logout-btn" data-tooltip="Logout"><i class="fas fa-sign-out-alt"></i><span class="link-text">Logout</span></a>
-    </div> -->
-
-
-<?php
-include 'steven.php';
-?>
+    <?php include 'steven.php'; ?>
 
     <div class="main-content sidebar-expanded">
         <h2>User Management</h2>
