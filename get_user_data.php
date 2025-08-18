@@ -45,4 +45,4 @@ try {
     error_log("Error in get_user_data.php: " . $e->getMessage(), 3, __DIR__ . '/logs/error_log.log');
     echo json_encode(['success' => false, 'message' => 'Server error']);
 }
-?>
+?>  

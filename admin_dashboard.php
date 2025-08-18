@@ -240,8 +240,6 @@ $accessHistory = $accessHistoryStmt ? $accessHistoryStmt->fetchAll(PDO::FETCH_AS
     <link rel="stylesheet" href="style/admin-interface.css">
     <link rel="stylesheet" href="style/admin-sidebar.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.1.0/docx.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 
@@ -290,8 +288,9 @@ $accessHistory = $accessHistoryStmt ? $accessHistoryStmt->fetchAll(PDO::FETCH_AS
     </div>
  -->
     
+
 <?php
-include 'steven.php';
+include 'admin_menu.php';
 ?>
 
     <div class="main-content">
@@ -325,7 +324,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('FileUploadTrends')">Print Report</button>
-                    <button onclick="openDownloadPopup('FileUploadTrends')">Download Report</button>
+                    <button onclick="showDownloadFormatPopup('FileUploadTrends')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="FileDistribution">
@@ -334,7 +333,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('FileDistribution')">Print Report</button>
-                    <button onclick="openDownloadPopup('FileDistribution')">Download Report</button>
+                    <button onclick="showDownloadFormatPopup('FileDistribution')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="UsersPerDepartment">
@@ -343,7 +342,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('UsersPerDepartment')">Print Report</button>
-                    <button onclick="openDownloadPopup('UsersPerDepartment')">Download Report</button>
+                    <button onclick="showDownloadFormatPopup('UsersPerDepartment')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="DocumentCopies">
@@ -352,18 +351,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('DocumentCopies')">Print Report</button>
-                    <button onclick="openDownloadPopup('DocumentCopies')">Download Report</button>
-        <!-- Download Format Popup -->
-        <div id="downloadFormatPopup" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
-            <div style="background:#fff;padding:30px 20px;border-radius:8px;max-width:320px;margin:auto;box-shadow:0 2px 10px rgba(0,0,0,0.2);text-align:center;">
-                <h3 style="margin-bottom:20px;">Select Download Format</h3>
-                <input type="hidden" id="popupChartType" value="">
-                <button class="format-btn" data-format="csv" style="margin:8px 0;padding:10px 30px;">CSV</button><br>
-                <button class="format-btn" data-format="docx" style="margin:8px 0;padding:10px 30px;">DOCX</button><br>
-                <button class="format-btn" data-format="pdf" style="margin:8px 0;padding:10px 30px;">PDF</button><br>
-                <button onclick="closeDownloadPopup()" style="margin-top:18px;padding:6px 18px;background:#eee;border-radius:4px;">Cancel</button>
-            </div>
-        </div>
+                    <button onclick="showDownloadFormatPopup('DocumentCopies')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="PendingRequests">
@@ -371,7 +359,7 @@ include 'steven.php';
                 <div class="chart-data-table"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('PendingRequests')">Print Report</button>
-                    <button onclick="downloadReport('PendingRequests')">Download Report</button>
+                    <button onclick="showDownloadFormatPopup('PendingRequests')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="RetrievalHistory">
@@ -380,11 +368,12 @@ include 'steven.php';
                     <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                         <button onclick="generateReport('RetrievalHistory')">Print Report</button>
                         <button onclick="downloadReport('RetrievalHistory')">Download Report</button>
+                        <button onclick="showDownloadFormatPopup('RetrievalHistory')">Download Report</button>
                     </div>
                 </div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('RetrievalHistory')">Print Report</button>
-                    <button onclick="downloadReport('RetrievalHistory')">Download Report</button>
+                    <button onclick="showDownloadFormatPopup('RetrievalHistory')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="AccessHistory">
@@ -392,39 +381,34 @@ include 'steven.php';
                 <div class="chart-data-table"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('AccessHistory')">Print Report</button>
-                    <button onclick="downloadReport('AccessHistory')">Download Report</button>
+                    <button onclick="showDownloadFormatPopup('AccessHistory')">Download Report</button>
                 </div>
             </div>
 
 
-            <div class="popup-overlay" id="popupOverlay">
-                <div class="popup-content" id="popupContent">
-                    <button class="popup-close" onclick="closePopup()">×</button>
-                    <h3 id="popupTitle"></h3>
-                    <canvas id="popupChart" style="display: none;"></canvas>
-                    <div id="popupTable"></div>
+            <!-- Download Format Selection Popup -->
+            <div class="popup-overlay" id="downloadFormatPopup" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+                <div class="popup-content" style="background:#fff; padding:30px 20px; border-radius:8px; min-width:300px; position:relative; text-align:center;">
+                    <button class="popup-close" onclick="closeDownloadFormatPopup()" style="position:absolute; top:10px; right:10px; font-size:20px; background:none; border:none; cursor:pointer;">×</button>
+                    <h3>Select Download Format</h3>
+                    <div style="margin:20px 0;">
+                        <button onclick="downloadReport(selectedChartType, 'csv')" style="margin:0 10px;">CSV</button>
+                        <button onclick="downloadReport(selectedChartType, 'docx')" style="margin:0 10px;">DOCX</button>
+                        <button onclick="downloadReport(selectedChartType, 'pdf')" style="margin:0 10px;">PDF</button>
+                    </div>
                 </div>
             </div>
-        </div>
         <script>
-            // Download format popup logic
-            function openDownloadPopup(chartType) {
-                document.getElementById('popupChartType').value = chartType;
+            let selectedChartType = null;
+            function showDownloadFormatPopup(chartType) {
+                selectedChartType = chartType;
                 document.getElementById('downloadFormatPopup').style.display = 'flex';
             }
-            function closeDownloadPopup() {
+            function closeDownloadFormatPopup() {
                 document.getElementById('downloadFormatPopup').style.display = 'none';
             }
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('.format-btn').forEach(btn => {
-                    btn.onclick = function() {
-                        const format = btn.getAttribute('data-format');
-                        const chartType = document.getElementById('popupChartType').value;
-                        closeDownloadPopup();
-                        downloadReport(chartType, format);
-                    };
-                });
-            });
+        </div>
+        <script>
             // Pass PHP data to JavaScript
             const fileUploadTrends = <?php echo json_encode($fileUploadTrends); ?>;
             const fileDistribution = <?php echo json_encode($fileDistribution); ?>;
@@ -1156,66 +1140,65 @@ include 'steven.php';
 
             // Download report as CSV
             function downloadReport(chartType) {
+            function downloadReport(chartType, format) {
+                closeDownloadFormatPopup();
                 let data;
-                let csvContent = '';
-                let format = arguments.length > 1 ? arguments[1] : 'csv';
-
-                switch (chartType) {
-                    case 'FileUploadTrends':
-                        data = fileUploadTrends;
-                        csvContent += 'File Name,Document Type,Uploader,Uploader\'s Department,Intended Destination,Upload Date/Time\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.document_name}","${entry.document_type}","${entry.uploader_name}","${entry.uploader_department || 'None'}","${entry.target_department_name || 'None'}","${new Date(entry.upload_date).toLocaleString()}"\n`;
-                        });
-                        break;
-                    case 'FileDistribution':
-                        data = fileDistribution;
-                        csvContent += 'File Name,Document Type,Sender,Recipient,Time Sent,Time Received,Department/Subdepartment\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.document_name}","${entry.document_type}","${entry.sender_name || 'None'}","${entry.receiver_name || 'None'}","${entry.time_sent ? new Date(entry.time_sent).toLocaleString() : 'N/A'}","${entry.time_received ? new Date(entry.time_received).toLocaleString() : 'N/A'}","${entry.department_name || 'None'}${entry.sub_department_name ? ' / ' + entry.sub_department_name : ''}"\n`;
-                        });
-                        break;
-                    case 'UsersPerDepartment':
-                        data = usersPerDepartment;
-                        csvContent += 'Department,User Count\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.department_name}","${entry.user_count}"\n`;
-                        });
-                        break;
-                    case 'DocumentCopies':
-                        data = documentCopies;
-                        csvContent += 'File Name,Copy Count,Offices with Copy,Physical Duplicates\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.file_name}","${entry.copy_count}","${entry.offices_with_copy || 'None'}","${entry.physical_duplicates || 'None'}"\n`;
-                        });
-                        break;
-                    case 'PendingRequests':
-                        data = pendingRequestsDetails;
-                        csvContent += 'File Name,Requester,Requester\'s Department,Physical Storage\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.file_name}","${entry.requester_name}","${entry.requester_department || 'None'}${entry.requester_subdepartment ? ' / ' + entry.requester_subdepartment : ''}","${entry.physical_storage || 'None'}"\n`;
-                        });
-                        break;
-                    case 'RetrievalHistory':
-                        data = retrievalHistory;
-                        csvContent += 'Transaction ID,Type,Status,Time,User,File Name,Department,Physical Storage\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.transaction_id}","${entry.type}","${entry.status}","${new Date(entry.time).toLocaleString()}","${entry.user_name}","${entry.file_name}","${entry.department_name || 'None'}","${entry.physical_storage || 'None'}"\n`;
-                        });
-                        break;
-                    case 'AccessHistory':
-                        data = accessHistory;
-                        csvContent += 'Transaction ID,Time,User,File Name,Type,Department\n';
-                        data.forEach(entry => {
-                            csvContent += `"${entry.transaction_id}","${new Date(entry.time).toLocaleString()}","${entry.user_name}","${entry.file_name}","${entry.type}","${entry.department_name || 'None'}"\n`;
-                        });
-                        break;
-                    default:
-                        alert('Download not implemented for this report type.');
-                        return;
-                }
-
-                if (format === 'csv') {
+                if (!format || format === 'csv') {
+                    let csvContent = '';
+                    switch (chartType) {
+                        case 'FileUploadTrends':
+                            data = fileUploadTrends;
+                            csvContent += 'File Name,Document Type,Uploader,Uploader\'s Department,Intended Destination,Upload Date/Time\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.document_name}","${entry.document_type}","${entry.uploader_name}","${entry.uploader_department || 'None'}","${entry.target_department_name || 'None'}","${new Date(entry.upload_date).toLocaleString()}"\n`;
+                            });
+                            break;
+                        case 'FileDistribution':
+                            data = fileDistribution;
+                            csvContent += 'File Name,Document Type,Sender,Recipient,Time Sent,Time Received,Department/Subdepartment\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.document_name}","${entry.document_type}","${entry.sender_name || 'None'}","${entry.receiver_name || 'None'}","${entry.time_sent ? new Date(entry.time_sent).toLocaleString() : 'N/A'}","${entry.time_received ? new Date(entry.time_received).toLocaleString() : 'N/A'}","${entry.department_name || 'None'}${entry.sub_department_name ? ' / ' + entry.sub_department_name : ''}"\n`;
+                            });
+                            break;
+                        case 'UsersPerDepartment':
+                            data = usersPerDepartment;
+                            csvContent += 'Department,User Count\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.department_name}","${entry.user_count}"\n`;
+                            });
+                            break;
+                        case 'DocumentCopies':
+                            data = documentCopies;
+                            csvContent += 'File Name,Copy Count,Offices with Copy,Physical Duplicates\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.file_name}","${entry.copy_count}","${entry.offices_with_copy || 'None'}","${entry.physical_duplicates || 'None'}"\n`;
+                            });
+                            break;
+                        case 'PendingRequests':
+                            data = pendingRequestsDetails;
+                            csvContent += 'File Name,Requester,Requester\'s Department,Physical Storage\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.file_name}","${entry.requester_name}","${entry.requester_department || 'None'}${entry.requester_subdepartment ? ' / ' + entry.requester_subdepartment : ''}","${entry.physical_storage || 'None'}"\n`;
+                            });
+                            break;
+                        case 'RetrievalHistory':
+                            data = retrievalHistory;
+                            csvContent += 'Transaction ID,Type,Status,Time,User,File Name,Department,Physical Storage\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.transaction_id}","${entry.type}","${entry.status}","${new Date(entry.time).toLocaleString()}","${entry.user_name}","${entry.file_name}","${entry.department_name || 'None'}","${entry.physical_storage || 'None'}"\n`;
+                            });
+                            break;
+                        case 'AccessHistory':
+                            data = accessHistory;
+                            csvContent += 'Transaction ID,Time,User,File Name,Type,Department\n';
+                            data.forEach(entry => {
+                                csvContent += `"${entry.transaction_id}","${new Date(entry.time).toLocaleString()}","${entry.user_name}","${entry.file_name}","${entry.type}","${entry.department_name || 'None'}"\n`;
+                            });
+                            break;
+                        default:
+                            alert('Download not implemented for this report type.');
+                            return;
+                    }
                     const blob = new Blob([csvContent], {
                         type: 'text/csv;charset=utf-8;'
                     });
@@ -1228,28 +1211,130 @@ include 'steven.php';
                     document.body.removeChild(link);
                     URL.revokeObjectURL(url);
                 } else if (format === 'docx') {
-                    // DOCX export using docx.js
-                    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun } = window.docx;
-                    let columns = csvContent.split('\n')[0].split(',');
-                    let rows = csvContent.split('\n').slice(1).filter(r => r);
-                    const doc = new Document({
+                    // DOCX export (simple table)
+                    // Requires docx.js library
+                    if (typeof window.docx === 'undefined') {
+                        alert('DOCX export requires docx.js library.');
+                        return;
+                    }
+                    let rows = [];
+                    let headers = [];
+                    switch (chartType) {
+                        case 'FileUploadTrends':
+                            data = fileUploadTrends;
+                            headers = ['File Name','Document Type','Uploader','Uploader\'s Department','Intended Destination','Upload Date/Time'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.document_name,
+                                    entry.document_type,
+                                    entry.uploader_name,
+                                    entry.uploader_department || 'None',
+                                    entry.target_department_name || 'None',
+                                    new Date(entry.upload_date).toLocaleString()
+                                ]);
+                            });
+                            break;
+                        case 'FileDistribution':
+                            data = fileDistribution;
+                            headers = ['File Name','Document Type','Sender','Recipient','Time Sent','Time Received','Department/Subdepartment'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.document_name,
+                                    entry.document_type,
+                                    entry.sender_name || 'None',
+                                    entry.receiver_name || 'None',
+                                    entry.time_sent ? new Date(entry.time_sent).toLocaleString() : 'N/A',
+                                    entry.time_received ? new Date(entry.time_received).toLocaleString() : 'N/A',
+                                    (entry.department_name || 'None') + (entry.sub_department_name ? ' / ' + entry.sub_department_name : '')
+                                ]);
+                            });
+                            break;
+                        case 'UsersPerDepartment':
+                            data = usersPerDepartment;
+                            headers = ['Department','User Count'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.department_name,
+                                    entry.user_count
+                                ]);
+                            });
+                            break;
+                        case 'DocumentCopies':
+                            data = documentCopies;
+                            headers = ['File Name','Copy Count','Offices with Copy','Physical Duplicates'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.file_name,
+                                    entry.copy_count,
+                                    entry.offices_with_copy || 'None',
+                                    entry.physical_duplicates || 'None'
+                                ]);
+                            });
+                            break;
+                        case 'PendingRequests':
+                            data = pendingRequestsDetails;
+                            headers = ['File Name','Requester','Requester\'s Department','Physical Storage'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.file_name,
+                                    entry.requester_name,
+                                    (entry.requester_department || 'None') + (entry.requester_subdepartment ? ' / ' + entry.requester_subdepartment : ''),
+                                    entry.physical_storage || 'None'
+                                ]);
+                            });
+                            break;
+                        case 'RetrievalHistory':
+                            data = retrievalHistory;
+                            headers = ['Transaction ID','Type','Status','Time','User','File Name','Department','Physical Storage'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.transaction_id,
+                                    entry.type,
+                                    entry.status,
+                                    new Date(entry.time).toLocaleString(),
+                                    entry.user_name,
+                                    entry.file_name,
+                                    entry.department_name || 'None',
+                                    entry.physical_storage || 'None'
+                                ]);
+                            });
+                            break;
+                        case 'AccessHistory':
+                            data = accessHistory;
+                            headers = ['Transaction ID','Time','User','File Name','Type','Department'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.transaction_id,
+                                    new Date(entry.time).toLocaleString(),
+                                    entry.user_name,
+                                    entry.file_name,
+                                    entry.type,
+                                    entry.department_name || 'None'
+                                ]);
+                            });
+                            break;
+                        default:
+                            alert('Download not implemented for this report type.');
+                            return;
+                    }
+                    // Build docx file
+                    const doc = new window.docx.Document({
                         sections: [{
                             children: [
-                                new Paragraph({ text: `${chartType} Report`, heading: 'Heading1' }),
-                                new Table({
+                                new window.docx.Table({
                                     rows: [
-                                        new TableRow({
-                                            children: columns.map(col => new TableCell({ children: [new Paragraph(col)] }))
+                                        new window.docx.TableRow({
+                                            children: headers.map(h => new window.docx.TableCell({children:[new window.docx.Paragraph(h)]}))
                                         }),
-                                        ...rows.map(row => new TableRow({
-                                            children: row.split(',').map(cell => new TableCell({ children: [new Paragraph(cell.replace(/"/g, ''))] }))
+                                        ...rows.map(row => new window.docx.TableRow({
+                                            children: row.map(cell => new window.docx.TableCell({children:[new window.docx.Paragraph(cell)]}))
                                         }))
                                     ]
                                 })
                             ]
                         }]
                     });
-                    Packer.toBlob(doc).then(blob => {
+                    window.docx.Packer.toBlob(doc).then(blob => {
                         const url = URL.createObjectURL(blob);
                         const link = document.createElement('a');
                         link.href = url;
@@ -1260,23 +1345,134 @@ include 'steven.php';
                         URL.revokeObjectURL(url);
                     });
                 } else if (format === 'pdf') {
-                    // PDF export using jsPDF
-                    const { jsPDF } = window.jspdf;
-                    let columns = csvContent.split('\n')[0].split(',');
-                    let rows = csvContent.split('\n').slice(1).filter(r => r);
-                    const doc = new jsPDF();
-                    doc.setFontSize(14);
+                    // PDF export (simple table)
+                    // Requires jsPDF library
+                    if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+                        alert('PDF export requires jsPDF library.');
+                        return;
+                    }
+                    let rows = [];
+                    let headers = [];
+                    switch (chartType) {
+                        case 'FileUploadTrends':
+                            data = fileUploadTrends;
+                            headers = ['File Name','Document Type','Uploader','Uploader\'s Department','Intended Destination','Upload Date/Time'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.document_name,
+                                    entry.document_type,
+                                    entry.uploader_name,
+                                    entry.uploader_department || 'None',
+                                    entry.target_department_name || 'None',
+                                    new Date(entry.upload_date).toLocaleString()
+                                ]);
+                            });
+                            break;
+                        case 'FileDistribution':
+                            data = fileDistribution;
+                            headers = ['File Name','Document Type','Sender','Recipient','Time Sent','Time Received','Department/Subdepartment'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.document_name,
+                                    entry.document_type,
+                                    entry.sender_name || 'None',
+                                    entry.receiver_name || 'None',
+                                    entry.time_sent ? new Date(entry.time_sent).toLocaleString() : 'N/A',
+                                    entry.time_received ? new Date(entry.time_received).toLocaleString() : 'N/A',
+                                    (entry.department_name || 'None') + (entry.sub_department_name ? ' / ' + entry.sub_department_name : '')
+                                ]);
+                            });
+                            break;
+                        case 'UsersPerDepartment':
+                            data = usersPerDepartment;
+                            headers = ['Department','User Count'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.department_name,
+                                    entry.user_count
+                                ]);
+                            });
+                            break;
+                        case 'DocumentCopies':
+                            data = documentCopies;
+                            headers = ['File Name','Copy Count','Offices with Copy','Physical Duplicates'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.file_name,
+                                    entry.copy_count,
+                                    entry.offices_with_copy || 'None',
+                                    entry.physical_duplicates || 'None'
+                                ]);
+                            });
+                            break;
+                        case 'PendingRequests':
+                            data = pendingRequestsDetails;
+                            headers = ['File Name','Requester','Requester\'s Department','Physical Storage'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.file_name,
+                                    entry.requester_name,
+                                    (entry.requester_department || 'None') + (entry.requester_subdepartment ? ' / ' + entry.requester_subdepartment : ''),
+                                    entry.physical_storage || 'None'
+                                ]);
+                            });
+                            break;
+                        case 'RetrievalHistory':
+                            data = retrievalHistory;
+                            headers = ['Transaction ID','Type','Status','Time','User','File Name','Department','Physical Storage'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.transaction_id,
+                                    entry.type,
+                                    entry.status,
+                                    new Date(entry.time).toLocaleString(),
+                                    entry.user_name,
+                                    entry.file_name,
+                                    entry.department_name || 'None',
+                                    entry.physical_storage || 'None'
+                                ]);
+                            });
+                            break;
+                        case 'AccessHistory':
+                            data = accessHistory;
+                            headers = ['Transaction ID','Time','User','File Name','Type','Department'];
+                            data.forEach(entry => {
+                                rows.push([
+                                    entry.transaction_id,
+                                    new Date(entry.time).toLocaleString(),
+                                    entry.user_name,
+                                    entry.file_name,
+                                    entry.type,
+                                    entry.department_name || 'None'
+                                ]);
+                            });
+                            break;
+                        default:
+                            alert('Download not implemented for this report type.');
+                            return;
+                    }
+                    // Build PDF file
+                    let doc;
+                    if (typeof window.jsPDF !== 'undefined') {
+                        doc = new window.jsPDF();
+                    } else {
+                        doc = new window.jspdf.jsPDF();
+                    }
+                    doc.setFontSize(12);
                     doc.text(`${chartType} Report`, 10, 10);
-                    let y = 20;
-                    doc.setFontSize(10);
-                    doc.text(columns.join(' | '), 10, y);
-                    y += 6;
+                    let startY = 20;
+                    // Headers
+                    doc.setFont(undefined, 'bold');
+                    doc.text(headers.join(' | '), 10, startY);
+                    doc.setFont(undefined, 'normal');
+                    startY += 8;
+                    // Rows
                     rows.forEach(row => {
-                        doc.text(row.replace(/"/g, '').split(',').join(' | '), 10, y);
-                        y += 6;
-                        if (y > 280) {
+                        doc.text(row.join(' | '), 10, startY);
+                        startY += 8;
+                        if (startY > 270) {
                             doc.addPage();
-                            y = 10;
+                            startY = 20;
                         }
                     });
                     doc.save(`${chartType}_Report.pdf`);

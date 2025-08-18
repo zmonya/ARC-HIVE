@@ -176,7 +176,7 @@ $totalPages = $itemsPerPage === -1 ? 1 : max(1, ceil($totalItems / $itemsPerPage
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="admin-interface.css">
-        <link rel="stylesheet" href="style/admin-sidebar.css">
+    <link rel="stylesheet" href="style/admin-sidebar.css">
     <style>
         body {
             margin: 0;
@@ -392,10 +392,11 @@ $totalPages = $itemsPerPage === -1 ? 1 : max(1, ceil($totalItems / $itemsPerPage
             <span class="link-text">Logout</span>
         </a>
     </div> -->
-    <?php
-    include 'steven.php';
-    ?>
 
+    
+    <?php
+    include 'admin_menu.php';
+    ?>
     <div class="main-content">
         <h2>Department Management</h2>
         <?php if ($successMessage): ?>
