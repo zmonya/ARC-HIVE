@@ -62,12 +62,11 @@ $display_hour = $backup_hour % 12 ?: 12;
 $am_pm = $backup_hour >= 12 ? 'PM' : 'AM';
 
 // Function to create database backup
-function createBackup($pdo, $backupDir, $isAuto = false)
-{
+function createBackup($pdo, $backupDir, $isAuto = false) {
     try {
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
-
-        $output = "-- Database Backup for arc-hive-maindb\n"; // Updated database name
+        
+        $output = "-- Database Backup for water_dispenser_system\n";
         $output .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
         $output .= "-- Type: " . ($isAuto ? 'Automatic' : 'Manual') . "\n\n";
 
@@ -80,7 +79,7 @@ function createBackup($pdo, $backupDir, $isAuto = false)
             if (!empty($rows)) {
                 $output .= "-- Data for $table\n";
                 foreach ($rows as $row) {
-                    $values = array_map(function ($value) use ($pdo) {
+                    $values = array_map(function($value) use ($pdo) {
                         return $value === null ? 'NULL' : $pdo->quote($value);
                     }, array_values($row));
                     $output .= "INSERT INTO `$table` VALUES (" . implode(',', $values) . ");\n";
@@ -91,11 +90,11 @@ function createBackup($pdo, $backupDir, $isAuto = false)
 
         $prefix = $isAuto ? 'auto_backup_' : 'manual_backup_';
         $filename = $backupDir . $prefix . date('Y-m-d_H-i-s') . '.sql';
-
+        
         if (!file_put_contents($filename, $output)) {
             throw new Exception("Failed to write backup file");
         }
-
+        
         // Implement retention policy: keep last 7 days of backups
         $retentionPeriod = 7 * 24 * 60 * 60;
         $backupFiles = glob($backupDir . '*.sql');
@@ -104,7 +103,7 @@ function createBackup($pdo, $backupDir, $isAuto = false)
                 unlink($file);
             }
         }
-
+        
         return $filename;
     } catch (Exception $e) {
         error_log("Backup creation failed: " . $e->getMessage());
@@ -173,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
         $settings['last_backup'] = null; // Reset last backup to allow new backup
         file_put_contents($settingsFile, json_encode($settings, JSON_PRETTY_PRINT));
         $notification = 'success|Automatic backup settings updated successfully.';
-
+        
         // Update display variables
         $display_hour = $backup_hour_24 % 12 ?: 12;
         $am_pm = $backup_hour_24 >= 12 ? 'PM' : 'AM';
@@ -215,19 +214,21 @@ if ($next_backup <= $now) {
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <title><?php echo $pageTitle; ?> - ArcHive</title>
-    <link rel="stylesheet" href="style/admin-interface.css">
-    <link rel="stylesheet" href="style/admin-sidebar.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="admin-interface.css">
+    <link rel="stylesheet" href="admin-sidebar.css">
 </head>
-
 <body class="admin-dashboard">
     <!-- Admin Sidebar -->
-    <!-- <div class="sidebar">
+    <div class="sidebar">
         <button class="toggle-btn" title="Toggle Sidebar" onclick="toggleSidebar()">
             <i class="fas fa-bars"></i>
         </button>
@@ -268,75 +269,67 @@ if ($next_backup <= $now) {
             <i class="fas fa-sign-out-alt"></i>
             <span class="link-text">Logout</span>
         </a>
-    </div> -->
-
-    <?php
-    include 'steven.php';
-    ?>
+    </div>
 
     <div class="main-content">
+        <h2>System Backup</h2>
+        <?php if ($notification): ?>
+            <p class="notification-toast <?php echo explode('|', $notification)[0]; ?>">
+                <?php echo htmlspecialchars(explode('|', $notification)[1], ENT_QUOTES, 'UTF-8'); ?>
+            </p>
+        <?php endif; ?>
+        
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" style="display: none;" class="notification-toast">
+            Creating automatic backup...
+        </div>
+
         <div class="content-area">
-            <div class="content-wrapper">
-                <!-- Notification Toast -->
-                <?php if ($notification): ?>
-                    <div class="notification-toast <?= explode('|', $notification)[0] ?>">
-                        <?= explode('|', $notification)[1] ?>
+            <!-- Current Time Display -->
+            <div class="current-time">
+                <h3>Current Time (Asia/Manila)</h3>
+                <p id="currentTime"><?php echo date('Y-m-d h:i:s A'); ?></p>
+                <p>Next Scheduled Backup: <span id="nextBackup"><?php echo $next_backup->format('Y-m-d h:i A'); ?></span></p>
+            </div>
+
+            <!-- Manual backup form -->
+            <form method="POST" id="backupForm" onsubmit="return confirmBackup();">
+                <button type="submit" name="backup" class="btn-primary">
+                    <i class="fas fa-plus"></i> Create Manual Backup
+                </button>
+            </form>
+
+            <!-- Automatic backup settings -->
+            <div class="backup-settings">
+                <h3>Automatic Backup Settings</h3>
+                <form method="POST" onsubmit="return confirmSettingsUpdate();">
+                    <div class="input-group">
+                        <label for="backup_date">Backup Date (Asia/Manila):</label>
+                        <input type="date" id="backup_date" name="backup_date" value="<?php echo $backup_date; ?>" required>
                     </div>
-                <?php endif; ?>
-
-                <!-- Loading Indicator -->
-                <div id="loadingIndicator" style="display: none;" class="notification-toast">
-                    Creating automatic backup...
-                </div>
-
-                <div class="content-header">
-                    <h1 class="content-title">Database Backup System (Philippines - Tarlac Time)</h1>
-                </div>
-
-                <!-- Current Time Display -->
-                <div class="current-time">
-                    <h3>Current Time (Asia/Manila)</h3>
-                    <p id="currentTime"><?php echo date('Y-m-d h:i:s A'); ?></p>
-                    <p>Next Scheduled Backup: <span id="nextBackup"><?php echo $next_backup->format('Y-m-d h:i A'); ?></span></p>
-                </div>
-
-                <!-- Manual backup form -->
-                <form method="POST" id="backupForm" onsubmit="return confirmBackup();">
-                    <button type="submit" name="backup" class="btn-primary">
-                        <i class="fas fa-plus"></i> Create Manual Backup
-                    </button>
+                    <div class="input-group">
+                        <label for="backup_hour">Backup Time (Asia/Manila):</label>
+                        <div class="time-inputs">
+                            <input type="number" id="backup_hour" name="backup_hour" min="1" max="12" value="<?php echo $display_hour; ?>" required placeholder="HH">
+                            <span>:</span>
+                            <input type="number" id="backup_minute" name="backup_minute" min="0" max="59" value="<?php printf("%02d", $backup_minute); ?>" required placeholder="MM">
+                            <select name="am_pm" required>
+                                <option value="AM" <?php echo $am_pm == 'AM' ? 'selected' : ''; ?>>AM</option>
+                                <option value="PM" <?php echo $am_pm == 'PM' ? 'selected' : ''; ?>>PM</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" name="update_settings" class="btn-primary">Update Settings</button>
                 </form>
+            </div>
 
-                <!-- Automatic backup settings -->
-                <div class="backup-settings">
-                    <h3>Automatic Backup Settings</h3>
-                    <form method="POST" onsubmit="return confirmSettingsUpdate();">
-                        <div class="input-group">
-                            <label for="backup_date">Backup Date (Asia/Manila):</label>
-                            <input type="date" id="backup_date" name="backup_date" value="<?php echo $backup_date; ?>" required>
-                        </div>
-                        <div class="input-group">
-                            <label for="backup_hour">Backup Time (Asia/Manila):</label>
-                            <div class="time-inputs">
-                                <input type="number" id="backup_hour" name="backup_hour" min="1" max="12" value="<?php echo $display_hour; ?>" required placeholder="HH">
-                                <span>:</span>
-                                <input type="number" id="backup_minute" name="backup_minute" min="0" max="59" value="<?php printf("%02d", $backup_minute); ?>" required placeholder="MM">
-                                <select name="am_pm" required>
-                                    <option value="AM" <?php echo $am_pm == 'AM' ? 'selected' : ''; ?>>AM</option>
-                                    <option value="PM" <?php echo $am_pm == 'PM' ? 'selected' : ''; ?>>PM</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button type="submit" name="update_settings" class="btn-primary">Update Settings</button>
-                    </form>
-                </div>
-
-                <!-- List existing backups -->
-                <div class="backup-list">
-                    <h3>Existing Backups</h3>
-                    <?php if (empty($backupFiles)): ?>
-                        <p>No backups found.</p>
-                    <?php else: ?>
+            <!-- List existing backups -->
+            <div class="backup-list">
+                <h3>Existing Backups</h3>
+                <?php if (empty($backupFiles)): ?>
+                    <p>No backups found.</p>
+                <?php else: ?>
+                    <div class="table-container">
                         <table class="data-table" id="backupsTable">
                             <thead>
                                 <tr>
@@ -349,17 +342,17 @@ if ($next_backup <= $now) {
                             <tbody id="backupsTableBody">
                                 <?php foreach ($backupFiles as $file): ?>
                                     <?php
-                                    $filename = basename($file);
-                                    $isAuto = strpos($filename, 'auto_backup_') === 0;
+                                        $filename = basename($file);
+                                        $isAuto = strpos($filename, 'auto_backup_') === 0;
                                     ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($filename); ?></td>
+                                        <td><?php echo htmlspecialchars($filename, ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td class="backup-type-<?php echo $isAuto ? 'auto' : 'manual'; ?>">
                                             <?php echo $isAuto ? 'Automatic' : 'Manual'; ?>
                                         </td>
                                         <td><?php echo date('Y-m-d H:i:s', filemtime($file)); ?></td>
-                                        <td>
-                                            <button class="btn-action download" onclick="window.location.href='<?php echo htmlspecialchars($file); ?>'">
+                                        <td class="action-buttons">
+                                            <button class="btn-action download" onclick="window.location.href='<?php echo htmlspecialchars($file, ENT_QUOTES, 'UTF-8'); ?>'">
                                                 <i class="fas fa-download"></i>
                                             </button>
                                             <button class="btn-action delete" onclick="if(confirm('Are you sure you want to delete this backup?')) window.location.href='backup.php?delete=<?php echo urlencode($filename); ?>'">
@@ -370,36 +363,90 @@ if ($next_backup <= $now) {
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
-                    <?php endif; ?>
-                </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <style>
+        body {
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 250px;
+            background-color: #2c3e50;
+            overflow-y: auto;
+            transition: width 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar.minimized {
+            width: 60px;
+        }
+
+        .main-content {
+            margin-left: 290px;
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            transition: margin-left 0.3s ease;
+        }
+
+        .main-content.sidebar-minimized {
+            margin-left: 60px;
+        }
+
         .content-area {
-            padding: 20px 0;
-            background-color: #f8f9fa;
             width: 100%;
         }
 
-        .content-wrapper {
-            padding: 0 30px;
-            max-width: 100%;
-            margin: 0 auto;
-        }
-
         .content-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             margin-bottom: 20px;
         }
 
-        .content-title {
+        h2 {
             font-size: 24px;
             color: #2c3e50;
             font-weight: 600;
+            margin: 0 0 20px;
+        }
+
+        .notification-toast {
+            font-weight: bold;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            width: fit-content;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            z-index: 1100;
+            animation: fadeOut 5s forwards;
+        }
+
+        .notification-toast.success {
+            background-color: #d4edda;
+            color: #28a745;
+        }
+
+        .notification-toast.error {
+            background-color: #f8d7da;
+            color: #dc3545;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; display: none; }
         }
 
         .current-time {
@@ -407,7 +454,7 @@ if ($next_backup <= $now) {
             padding: 15px;
             background: #fff;
             border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .current-time h3 {
@@ -420,33 +467,12 @@ if ($next_backup <= $now) {
             font-size: 16px;
         }
 
-        .notification-toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 6px;
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            z-index: 1100;
-            animation: slideIn 0.3s, fadeOut 0.5s 2.5s forwards;
-        }
-
-        .notification-toast.success {
-            background-color: #2ecc71;
-        }
-
-        .notification-toast.error {
-            background-color: #e74c3c;
-        }
-
         .btn-primary {
             color: #fff;
-            background-color: #3498db;
+            background-color: #28a745;
             border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
@@ -457,7 +483,7 @@ if ($next_backup <= $now) {
         }
 
         .btn-primary:hover {
-            background-color: #2980b9;
+            background-color: #218838;
             transform: translateY(-1px);
         }
 
@@ -499,9 +525,9 @@ if ($next_backup <= $now) {
 
         .backup-settings input,
         .backup-settings select {
-            padding: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             width: 100px;
         }
 
@@ -532,6 +558,10 @@ if ($next_backup <= $now) {
             margin-bottom: 10px;
         }
 
+        .table-container {
+            position: relative;
+        }
+
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -540,15 +570,17 @@ if ($next_backup <= $now) {
 
         .data-table th,
         .data-table td {
-            padding: 12px 15px;
+            padding: 8px;
             text-align: left;
-            border-bottom: 1px solid #e9ecef;
+            border: 1px solid #ddd;
         }
 
         .data-table th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-            color: #2c3e50;
+            background-color: #3d3d3d;
+            color: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .data-table tr:hover {
@@ -556,71 +588,52 @@ if ($next_backup <= $now) {
         }
 
         .backup-type-auto {
-            color: #2ecc71;
+            color: #28a745;
             font-weight: bold;
         }
 
         .backup-type-manual {
-            color: #3498db;
+            color: #007bff;
             font-weight: bold;
         }
 
-        .btn-action {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            margin-right: 8px;
-            transition: all 0.2s;
+        .action-buttons button {
+            margin-right: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
         }
 
         .btn-action.download {
-            background-color: rgba(52, 152, 219, 0.1);
-            color: #3498db;
+            background-color: #007bff;
+            color: white;
         }
 
         .btn-action.download:hover {
-            background-color: #3498db;
-            color: white;
+            background-color: #0056b3;
         }
 
         .btn-action.delete {
-            background-color: rgba(231, 76, 60, 0.1);
-            color: #e74c3c;
-        }
-
-        .btn-action.delete:hover {
-            background-color: #e74c3c;
+            background-color: #dc3545;
             color: white;
         }
 
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @keyframes fadeOut {
-            from {
-                opacity: 1;
-            }
-
-            to {
-                opacity: 0;
-            }
+        .btn-action.delete:hover {
+            background-color: #c82333;
         }
 
         @media (max-width: 768px) {
-            .content-wrapper {
-                padding: 0 15px;
+            .sidebar {
+                width: 60px;
+            }
+
+            .main-content {
+                margin-left: 60px;
+            }
+
+            .main-content.sidebar-expanded {
+                margin-left: 290px;
             }
 
             .backup-settings input,
@@ -636,6 +649,15 @@ if ($next_backup <= $now) {
             .btn-primary {
                 width: 100%;
                 justify-content: center;
+            }
+
+            .data-table {
+                font-size: 14px;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 6px;
             }
         }
     </style>
@@ -674,8 +696,16 @@ if ($next_backup <= $now) {
                 if (amPmInput === 'PM' && hour < 12) hour += 12;
                 if (amPmInput === 'AM' && hour === 12) hour = 0;
                 const scheduledDateTime = new Date(`${dateInput}T${hour.toString().padStart(2, '0')}:${minuteInput.padStart(2, '0')}:00`);
+                
+                // Ensure scheduled time is in the future
+                const now = new Date();
+                const nowInManila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+                if (scheduledDateTime <= nowInManila) {
+                    scheduledDateTime.setDate(scheduledDateTime.getDate() + 1);
+                }
+                
                 scheduledTime = scheduledDateTime;
-
+                
                 // Update next backup display
                 const nextBackup = document.getElementById('nextBackup');
                 nextBackup.textContent = scheduledTime.toLocaleString('en-PH', {
@@ -693,13 +723,14 @@ if ($next_backup <= $now) {
         function checkSchedule() {
             if (scheduledTime) {
                 const now = new Date();
-                const nowInManila = new Date(now.toLocaleString('en-US', {
-                    timeZone: 'Asia/Manila'
-                }));
-                if (nowInManila.getTime() >= scheduledTime.getTime()) {
+                const nowInManila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+                const timeDiff = scheduledTime.getTime() - nowInManila.getTime();
+                
+                // Only trigger if the scheduled time is within 1 second and in the future
+                if (timeDiff >= 0 && timeDiff <= 1000) {
                     const loadingIndicator = document.getElementById('loadingIndicator');
                     loadingIndicator.style.display = 'block';
-
+                    
                     fetch('backup.php?check_auto_backup=1')
                         .then(response => {
                             if (response.headers.get('content-type')?.includes('application/octet-stream')) {
@@ -712,10 +743,7 @@ if ($next_backup <= $now) {
                                     a.click();
                                     document.body.removeChild(a);
                                     window.URL.revokeObjectURL(url);
-                                    return {
-                                        status: 'success',
-                                        message: 'Automatic backup created and downloaded'
-                                    };
+                                    return { status: 'success', message: 'Automatic backup created and downloaded' };
                                 });
                             }
                             return response.json();
@@ -728,8 +756,8 @@ if ($next_backup <= $now) {
                             document.body.appendChild(toast);
                             setTimeout(() => {
                                 toast.remove();
-                            }, 3000);
-
+                            }, 5000);
+                            
                             if (data.status === 'success') {
                                 // Refresh backup list
                                 fetchBackupList();
@@ -755,7 +783,7 @@ if ($next_backup <= $now) {
                             document.body.appendChild(toast);
                             setTimeout(() => {
                                 toast.remove();
-                            }, 3000);
+                            }, 5000);
                         });
                 }
             }
@@ -784,21 +812,19 @@ if ($next_backup <= $now) {
             const minute = document.getElementById('backup_minute').value;
             const ampm = document.querySelector('select[name="am_pm"]').value;
             const date = document.getElementById('backup_date').value;
-
+            
             if (hour < 1 || hour > 12 || minute < 0 || minute > 59 || !['AM', 'PM'].includes(ampm) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                 alert('Invalid input. Please use hours 1-12, minutes 0-59, valid AM/PM, and date in YYYY-MM-DD format.');
                 return false;
             }
-            setScheduledTime(); // Update scheduled time on settings update
+            setScheduledTime();
             return confirm('Are you sure you want to update the automatic backup settings?');
         }
 
-        // Sidebar toggle function
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');
             const mainContent = document.querySelector('.main-content');
             sidebar.classList.toggle('minimized');
-            mainContent.classList.toggle('sidebar-expanded');
             mainContent.classList.toggle('sidebar-minimized');
         }
 
@@ -808,25 +834,24 @@ if ($next_backup <= $now) {
             if (toast) {
                 setTimeout(() => {
                     toast.style.display = 'none';
-                }, 3000);
+                }, 5000);
             }
-
+            
             // Initialize scheduled time
             setScheduledTime();
-
+            
             // Update time every second
             updateTime();
             setInterval(updateTime, 1000);
-
+            
             // Check schedule every second
             setInterval(checkSchedule, 1000);
 
             // Initialize sidebar state
             const sidebar = document.querySelector('.sidebar');
             const mainContent = document.querySelector('.main-content');
-            mainContent.classList.add(sidebar.classList.contains('minimized') ? 'sidebar-minimized' : 'sidebar-expanded');
+            mainContent.classList.add(sidebar.classList.contains('minimized') ? 'sidebar-minimized' : '');
         });
     </script>
 </body>
-
 </html>
