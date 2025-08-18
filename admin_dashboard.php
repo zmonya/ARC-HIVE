@@ -240,6 +240,8 @@ $accessHistory = $accessHistoryStmt ? $accessHistoryStmt->fetchAll(PDO::FETCH_AS
     <link rel="stylesheet" href="style/admin-interface.css">
     <link rel="stylesheet" href="style/admin-sidebar.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.1.0/docx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 
@@ -323,7 +325,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('FileUploadTrends')">Print Report</button>
-                    <button onclick="downloadReport('FileUploadTrends')">Download Report</button>
+                    <button onclick="openDownloadPopup('FileUploadTrends')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="FileDistribution">
@@ -332,7 +334,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('FileDistribution')">Print Report</button>
-                    <button onclick="downloadReport('FileDistribution')">Download Report</button>
+                    <button onclick="openDownloadPopup('FileDistribution')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="UsersPerDepartment">
@@ -341,7 +343,7 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('UsersPerDepartment')">Print Report</button>
-                    <button onclick="downloadReport('UsersPerDepartment')">Download Report</button>
+                    <button onclick="openDownloadPopup('UsersPerDepartment')">Download Report</button>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="DocumentCopies">
@@ -350,7 +352,18 @@ include 'steven.php';
                 <div class="chart-data-table" style="display: none;"></div>
                 <div class="chart-actions" style="text-align: right; margin-bottom: 10px;">
                     <button onclick="generateReport('DocumentCopies')">Print Report</button>
-                    <button onclick="downloadReport('DocumentCopies')">Download Report</button>
+                    <button onclick="openDownloadPopup('DocumentCopies')">Download Report</button>
+        <!-- Download Format Popup -->
+        <div id="downloadFormatPopup" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:30px 20px;border-radius:8px;max-width:320px;margin:auto;box-shadow:0 2px 10px rgba(0,0,0,0.2);text-align:center;">
+                <h3 style="margin-bottom:20px;">Select Download Format</h3>
+                <input type="hidden" id="popupChartType" value="">
+                <button class="format-btn" data-format="csv" style="margin:8px 0;padding:10px 30px;">CSV</button><br>
+                <button class="format-btn" data-format="docx" style="margin:8px 0;padding:10px 30px;">DOCX</button><br>
+                <button class="format-btn" data-format="pdf" style="margin:8px 0;padding:10px 30px;">PDF</button><br>
+                <button onclick="closeDownloadPopup()" style="margin-top:18px;padding:6px 18px;background:#eee;border-radius:4px;">Cancel</button>
+            </div>
+        </div>
                 </div>
             </div>
             <div class="chart-container" data-chart-type="PendingRequests">
@@ -394,6 +407,24 @@ include 'steven.php';
             </div>
         </div>
         <script>
+            // Download format popup logic
+            function openDownloadPopup(chartType) {
+                document.getElementById('popupChartType').value = chartType;
+                document.getElementById('downloadFormatPopup').style.display = 'flex';
+            }
+            function closeDownloadPopup() {
+                document.getElementById('downloadFormatPopup').style.display = 'none';
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('.format-btn').forEach(btn => {
+                    btn.onclick = function() {
+                        const format = btn.getAttribute('data-format');
+                        const chartType = document.getElementById('popupChartType').value;
+                        closeDownloadPopup();
+                        downloadReport(chartType, format);
+                    };
+                });
+            });
             // Pass PHP data to JavaScript
             const fileUploadTrends = <?php echo json_encode($fileUploadTrends); ?>;
             const fileDistribution = <?php echo json_encode($fileDistribution); ?>;
@@ -1127,6 +1158,7 @@ include 'steven.php';
             function downloadReport(chartType) {
                 let data;
                 let csvContent = '';
+                let format = arguments.length > 1 ? arguments[1] : 'csv';
 
                 switch (chartType) {
                     case 'FileUploadTrends':
@@ -1183,17 +1215,72 @@ include 'steven.php';
                         return;
                 }
 
-                const blob = new Blob([csvContent], {
-                    type: 'text/csv;charset=utf-8;'
-                });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.setAttribute('href', url);
-                link.setAttribute('download', `${chartType}_Report.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                if (format === 'csv') {
+                    const blob = new Blob([csvContent], {
+                        type: 'text/csv;charset=utf-8;'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${chartType}_Report.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                } else if (format === 'docx') {
+                    // DOCX export using docx.js
+                    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun } = window.docx;
+                    let columns = csvContent.split('\n')[0].split(',');
+                    let rows = csvContent.split('\n').slice(1).filter(r => r);
+                    const doc = new Document({
+                        sections: [{
+                            children: [
+                                new Paragraph({ text: `${chartType} Report`, heading: 'Heading1' }),
+                                new Table({
+                                    rows: [
+                                        new TableRow({
+                                            children: columns.map(col => new TableCell({ children: [new Paragraph(col)] }))
+                                        }),
+                                        ...rows.map(row => new TableRow({
+                                            children: row.split(',').map(cell => new TableCell({ children: [new Paragraph(cell.replace(/"/g, ''))] }))
+                                        }))
+                                    ]
+                                })
+                            ]
+                        }]
+                    });
+                    Packer.toBlob(doc).then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `${chartType}_Report.docx`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    });
+                } else if (format === 'pdf') {
+                    // PDF export using jsPDF
+                    const { jsPDF } = window.jspdf;
+                    let columns = csvContent.split('\n')[0].split(',');
+                    let rows = csvContent.split('\n').slice(1).filter(r => r);
+                    const doc = new jsPDF();
+                    doc.setFontSize(14);
+                    doc.text(`${chartType} Report`, 10, 10);
+                    let y = 20;
+                    doc.setFontSize(10);
+                    doc.text(columns.join(' | '), 10, y);
+                    y += 6;
+                    rows.forEach(row => {
+                        doc.text(row.replace(/"/g, '').split(',').join(' | '), 10, y);
+                        y += 6;
+                        if (y > 280) {
+                            doc.addPage();
+                            y = 10;
+                        }
+                    });
+                    doc.save(`${chartType}_Report.pdf`);
+                }
             }
 
             // Sidebar toggle function
