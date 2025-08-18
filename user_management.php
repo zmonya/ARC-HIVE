@@ -234,48 +234,119 @@ $csrfToken = generateCsrfToken();
 
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
-    <title>User Management - ArcHive</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="admin-interface.css">
-    <link rel="stylesheet" href="style/admin-sidebar.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+<?php include 'admin_head.php'; ?>
+<body class="admin-dashboard">
+    <?php include 'admin_menu.php'; ?>
+
+    <div class="main-content">
+        <h2>User Management</h2>
+        <?php if ($successMessage): ?>
+            <p class="success"><?php echo sanitizeHTML($successMessage); ?></p>
+        <?php endif; ?>
+        <?php if ($errorMessage): ?>
+            <p class="error"><?php echo sanitizeHTML($errorMessage); ?></p>
+        <?php endif; ?>
+
+        <div class="filter-container">
+            <label for="role_filter">Filter by Role:</label>
+            <select id="role_filter" onchange="updateRoleFilter()">
+                <option value="" <?php echo $roleFilter === '' ? 'selected' : ''; ?>>All</option>
+                <option value="admin" <?php echo $roleFilter === 'admin' ? 'selected' : ''; ?>>Admin</option>
+                <option value="user" <?php echo $roleFilter === 'user' ? 'selected' : ''; ?>>User</option>
+                <option value="client" <?php echo $roleFilter === 'client' ? 'selected' : ''; ?>>Client</option>
+            </select>
+        </div>
+
+        <button class="add-department-btn" onclick="openModal('add')">Add New User</button>
+
+        <div class="table-container">
+            <table class="department-table">
+                <thead>
+                    <tr>
+                        <th>Profile</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Position</th>
+                        <th>Departments</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($paginatedUsers)): ?>
+                        <tr><td colspan="7">No users found.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($paginatedUsers as $user): ?>
+                            <tr>
+                                <td>
+                                    <?php if (!empty($user['profile_pic'])): ?>
+                                        <img src="data:image/jpeg;base64,<?php echo base64_encode($user['profile_pic']); ?>" alt="Profile" style="width: 50px; height: 50px; border-radius: 50%;">
+                                    <?php else: ?>
+                                        No Profile Picture
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo sanitizeHTML($user['username']); ?></td>
+                                <td><?php echo sanitizeHTML($user['email']); ?></td>
+                                <td><?php echo sanitizeHTML($user['position']); ?></td>
+                                <td><?php echo sanitizeHTML($user['departments'] ?? 'None'); ?></td>
+                                <td><?php echo sanitizeHTML($user['role']); ?></td>
+                                <td class="action-buttons">
+                                    <button class="edit-btn" onclick='openModal("edit", <?php echo json_encode($user); ?>)'>Edit</button>
+                                    <button class="delete-btn" onclick='openModal("delete", <?php echo json_encode(['user_id' => $user['user_id'], 'username' => $user['username']]); ?>)'>Delete</button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+
+            <!-- Pagination Controls -->
+            <div class="pagination">
+                <div>
+                    <label for="items_per_page">Items per page:</label>
+                    <select id="items_per_page" onchange="updateItemsPerPage()">
+                        <option value="5" <?php echo $itemsPerPage === 5 ? 'selected' : ''; ?>>5</option>
+                        <option value="10" <?php echo $itemsPerPage === 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="20" <?php echo $itemsPerPage === 20 ? 'selected' : ''; ?>>20</option>
+                        <option value="-1" <?php echo $itemsPerPage === -1 ? 'selected' : ''; ?>>All</option>
+                    </select>
+                </div>
+                <div>
+                    <button onclick="goToPage(<?php echo $currentPage - 1; ?>)" <?php echo $currentPage <= 1 ? 'disabled' : ''; ?>>Previous</button>
+                    <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
+                    <button onclick="goToPage(<?php echo $currentPage + 1; ?>)" <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>>Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Add/Edit/Delete -->
+        <div class="modal" id="user-modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h3 id="modal-title">User Action</h3>
+                <form id="user-form" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" id="form-action">
+                    <input type="hidden" name="user_id" id="user_id">
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrfToken; ?>">
+                    <div id="form-content">
+                        <!-- Dynamic form content will be injected here -->
+                    </div>
+                    <button type="submit" id="form-submit" data-action="">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <style>
-        body {
-            margin: 0;
-            font-family: 'Montserrat', sans-serif;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: 250px;
-            transition: width 0.3s ease;
-            z-index: 1000;
-        }
-        .sidebar.minimized {
-            width: 60px;
-        }
         .main-content {
-            margin-left: 290px;
+            margin-left: 290px; /* Align with expanded sidebar */
             padding: 20px;
-            flex: 1;
-            overflow-y: auto;
+            flex: 1; /* Take remaining space */
+            overflow-y: auto; /* Allow scrolling in main content */
             transition: margin-left 0.3s ease;
         }
         .main-content.sidebar-minimized {
-            margin-left: 60px;
+            margin-left: 60px; /* Align with minimized sidebar */
         }
         .error, .success {
             font-weight: bold;
@@ -331,17 +402,17 @@ $csrfToken = generateCsrfToken();
         .table-container {
             position: relative;
         }
-        .user-table {
+        .department-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
-        .user-table th, .user-table td {
+        .department-table th, .department-table td {
             border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
         }
-        .user-table th {
+        .department-table th {
             background-color: #3d3d3dff;
             position: sticky;
             top: 0;
@@ -362,7 +433,7 @@ $csrfToken = generateCsrfToken();
             background-color: #dc3545;
             color: white;
         }
-        .add-user-btn {
+        .add-department-btn {
             padding: 8px 16px;
             background-color: #28a745;
             color: white;
@@ -447,154 +518,6 @@ $csrfToken = generateCsrfToken();
             100% { background-color: transparent; }
         }
     </style>
-</head>
-<body class="admin-dashboard">
-    <!-- Admin Sidebar -->
-    <!-- <div class="sidebar">
-        <button class="toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
-            <i class="fas fa-bars"></i>
-        </button>
-        <h2 class="sidebar-title">Admin Panel</h2>
-        <a href="dashboard.php" class="client-btn">
-            <i class="fas fa-exchange-alt"></i>
-            <span class="link-text">Switch to Client View</span>
-        </a>
-        <a href="admin_dashboard.php">
-            <i class="fas fa-home"></i>
-            <span class="link-text">Dashboard</span>
-        </a>
-        <a href="admin_search.php">
-            <i class="fas fa-search"></i>
-            <span class="link-text">View All Files</span>
-        </a>
-        <a href="user_management.php" class="active">
-            <i class="fas fa-users"></i>
-            <span class="link-text">User Management</span>
-        </a>
-        <a href="department_management.php">
-            <i class="fas fa-building"></i>
-            <span class="link-text">Department Management</span>
-        </a>
-        <a href="physical_storage_management.php">
-            <i class="fas fa-archive"></i>
-            <span class="link-text">Physical Storage</span>
-        </a>
-        <a href="document_type_management.php">
-            <i class="fas fa-file-alt"></i>
-            <span class="link-text">Document Type Management</span>
-        </a>
-        <a href="backup.php">
-            <i class="fas fa-file-alt"></i>
-            <span class="link-text">System Backup</span>
-        </a>
-        <a href="logout.php" class="logout-btn">
-            <i class="fas fa-sign-out-alt"></i>
-            <span class="link-text">Logout</span>
-        </a>
-    </div> -->
-
-    <?php
-    include 'admin_menu.php';
-    ?>
-
-    <div class="main-content">
-        <h2>User Management</h2>
-        <?php if ($successMessage): ?>
-            <p class="success"><?php echo sanitizeHTML($successMessage); ?></p>
-        <?php endif; ?>
-        <?php if ($errorMessage): ?>
-            <p class="error"><?php echo sanitizeHTML($errorMessage); ?></p>
-        <?php endif; ?>
-
-        <div class="filter-container">
-            <label for="role_filter">Filter by Role:</label>
-            <select id="role_filter" onchange="updateRoleFilter()">
-                <option value="" <?php echo $roleFilter === '' ? 'selected' : ''; ?>>All</option>
-                <option value="admin" <?php echo $roleFilter === 'admin' ? 'selected' : ''; ?>>Admin</option>
-                <option value="user" <?php echo $roleFilter === 'user' ? 'selected' : ''; ?>>User</option>
-                <option value="client" <?php echo $roleFilter === 'client' ? 'selected' : ''; ?>>Client</option>
-            </select>
-        </div>
-
-        <button class="add-user-btn" onclick="openModal('add')">Add New User</button>
-
-        <div class="table-container">
-            <table class="user-table">
-                <thead>
-                    <tr>
-                        <th>Profile</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Position</th>
-                        <th>Departments</th>
-                        <th>Role</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($paginatedUsers)): ?>
-                        <tr><td colspan="7">No users found.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($paginatedUsers as $user): ?>
-                            <tr>
-                                <td>
-                                    <?php if (!empty($user['profile_pic'])): ?>
-                                        <img src="data:image/jpeg;base64,<?php echo base64_encode($user['profile_pic']); ?>" alt="Profile" style="width: 50px; height: 50px; border-radius: 50%;">
-                                    <?php else: ?>
-                                        No Profile Picture
-                                    <?php endif; ?>
-                                </td>
-                                <td><?php echo sanitizeHTML($user['username']); ?></td>
-                                <td><?php echo sanitizeHTML($user['email']); ?></td>
-                                <td><?php echo sanitizeHTML($user['position']); ?></td>
-                                <td><?php echo sanitizeHTML($user['departments'] ?? 'None'); ?></td>
-                                <td><?php echo sanitizeHTML($user['role']); ?></td>
-                                <td class="action-buttons">
-                                    <button class="edit-btn" onclick='openModal("edit", <?php echo json_encode($user); ?>)'>Edit</button>
-                                    <button class="delete-btn" onclick='openModal("delete", <?php echo json_encode(['user_id' => $user['user_id'], 'username' => $user['username']]); ?>)'>Delete</button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-
-            <!-- Pagination Controls -->
-            <div class="pagination">
-                <div>
-                    <label for="items_per_page">Items per page:</label>
-                    <select id="items_per_page" onchange="updateItemsPerPage()">
-                        <option value="5" <?php echo $itemsPerPage === 5 ? 'selected' : ''; ?>>5</option>
-                        <option value="10" <?php echo $itemsPerPage === 10 ? 'selected' : ''; ?>>10</option>
-                        <option value="20" <?php echo $itemsPerPage === 20 ? 'selected' : ''; ?>>20</option>
-                        <option value="-1" <?php echo $itemsPerPage === -1 ? 'selected' : ''; ?>>All</option>
-                    </select>
-                </div>
-                <div>
-                    <button onclick="goToPage(<?php echo $currentPage - 1; ?>)" <?php echo $currentPage <= 1 ? 'disabled' : ''; ?>>Previous</button>
-                    <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
-                    <button onclick="goToPage(<?php echo $currentPage + 1; ?>)" <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>>Next</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal for Add/Edit/Delete -->
-        <div class="modal" id="user-modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeModal()">&times;</span>
-                <h3 id="modal-title">User Action</h3>
-                <form id="user-form" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="action" id="form-action">
-                    <input type="hidden" name="user_id" id="user_id">
-                    <input type="hidden" name="csrf_token" value="<?php echo $csrfToken; ?>">
-                    <div id="form-content">
-                        <!-- Dynamic form content will be injected here -->
-                    </div>
-                    <button type="submit" id="form-submit" data-action="">Submit</button>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <script>
         let cropper = null;

@@ -1,18 +1,7 @@
-<!-- <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - ArcHive</title>
-    <link rel="stylesheet" href="style/admin-interface.css">
-    <link rel="stylesheet" href="style/admin-sidebar.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-</head>
- -->
-<body class="admin-dashboard">
-    <!-- Admin Sidebar -->
-    <div class="sidebar">
-        <button class="toggle-btn" title="Toggle Sidebar">
+<div class="sidebar">
+<!--         <button class="toggle-btn" title="Toggle Sidebar">
             <i class="fas fa-bars"></i>
-        </button>
+        </button> -->
         <h2 class="sidebar-title">Admin Panel</h2>
         <a href="dashboard.php" class="client-btn">
             <i class="fas fa-exchange-alt"></i>
@@ -43,7 +32,7 @@
             <span class="link-text">Document Type Management</span>
         </a>
         <a href="backup.php">
-            <i class="fas fa-file-alt"></i>
+            <i class="fas fa-database"></i>
             <span class="link-text">System Backup</span>
             <a href="logout.php" class="logout-btn">
                 <i class="fas fa-sign-out-alt"></i>
