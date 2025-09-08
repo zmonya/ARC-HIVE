@@ -446,3 +446,13 @@ operable program or batch file.
 [2025-08-30 17:10:13] [INFO] OCR completed for file ID 266 (pages: 3, execution time: 0.74909996986389s)
 [2025-08-30 17:10:13] [INFO] OCR processor finished
 >>>>>>> 2aecf55b5b45af97dd77ff24ac42487a215cdd54
+[2025-09-04 20:42:12] [INFO] Starting OCR processor
+[2025-09-04 20:42:12] [INFO] Processing specific file ID: 262
+[2025-09-04 20:42:12] [INFO] File found: C:\xampp\htdocs\GitHub.com\Arc_Hive-main\uploads\Uploads\College of Education\Technology and Livelihood Education\Sgt Caleb Steven A Lagunilla PA (Res)\User_1\UsersPerDepartment_Report_20250903064911.pdf, type: application/pdf, status: completed
+[2025-09-04 20:42:12] [INFO] Processing file ID: 262, path: C:\xampp\htdocs\GitHub.com\Arc_Hive-main\uploads\Uploads\College of Education\Technology and Livelihood Education\Sgt Caleb Steven A Lagunilla PA (Res)\User_1\UsersPerDepartment_Report_20250903064911.pdf, type: pdf
+[2025-09-04 20:42:12] [INFO] Starting text extraction for file ID 262, type: pdf (application/pdf), path: C:\xampp\htdocs\GitHub.com\Arc_Hive-main\uploads\Uploads\College of Education\Technology and Livelihood Education\Sgt Caleb Steven A Lagunilla PA (Res)\User_1\UsersPerDepartment_Report_20250903064911.pdf
+[2025-09-04 20:42:12] [INFO] Processing PDF file: C:\xampp\htdocs\GitHub.com\Arc_Hive-main\uploads\Uploads\College of Education\Technology and Livelihood Education\Sgt Caleb Steven A Lagunilla PA (Res)\User_1\UsersPerDepartment_Report_20250903064911.pdf
+[2025-09-04 20:42:12] [INFO] PDF contains text, extracting directly
+[2025-09-04 20:42:12] [INFO] Inserted 1 pages into file_pages table
+[2025-09-04 20:42:12] [INFO] OCR completed for file ID 262 (pages: 1, execution time: 0.085336923599243s)
+[2025-09-04 20:42:12] [INFO] OCR processor finished

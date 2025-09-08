@@ -4,23 +4,24 @@ require 'db_connection.php';
 require 'log_activity.php';
 require 'notification.php';
 
-// Security: Session & CSRF
+// ---- Security: Session & CSRF ----
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    error_log("Generated new CSRF token for user_id=$userId: {$_SESSION['csrf_token']}");
 }
 
-// User context
+// ---- User context ----
 $userId = filter_var($_SESSION['user_id'], FILTER_VALIDATE_INT) ?: 0;
 $userRole = trim($_SESSION['role'] ?? 'client');
 
-// Fetch user details and departments, including profile picture
+// ---- Fetch user details + departments ----
 $stmt = $pdo->prepare("
-    SELECT u.user_id, u.username, u.role, u.profile_picture, d.department_id, d.department_name, d2.department_id AS parent_dept_id, d2.department_name AS parent_dept_name
+    SELECT u.user_id, u.username, u.role, u.profile_picture, 
+           d.department_id, d.department_name, 
+           d2.department_id AS parent_dept_id, d2.department_name AS parent_dept_name
     FROM users u
     LEFT JOIN user_department_assignments ud ON u.user_id = ud.user_id
     LEFT JOIN departments d ON ud.department_id = d.department_id
@@ -29,7 +30,14 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$userId]);
 $userData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 $user = $userData[0] ?? null;
+if (!$user) {
+    error_log("User not found for ID: $userId");
+    header('Location: logout.php');
+    exit;
+}
+
 $userDepartments = array_map(fn($row) => [
     'department_id' => $row['department_id'],
     'department_name' => $row['department_name'],
@@ -47,40 +55,29 @@ foreach ($userDepartments as $dept) {
     }
 }
 
-if (!$user) {
-    error_log("User not found for ID: $userId");
-    header('Location: logout.php');
-    exit;
-}
-
-// Determine profile picture path
+// ---- Profile picture ----
 $profilePicture = !empty($user['profile_picture']) && file_exists($user['profile_picture'])
     ? htmlspecialchars($user['profile_picture'])
     : 'user.jpg';
 
-// Debug: Log user ID and query results
-error_log("User ID: $userId, Role: $userRole, Profile Picture: $profilePicture");
-
-// Fetch document types
-$stmt = $pdo->prepare("SELECT document_type_id, type_name AS name FROM document_types ORDER BY type_name ASC");
-$stmt->execute();
+// ---- Fetch document types ----
+$stmt = $pdo->query("SELECT document_type_id, type_name AS name FROM document_types ORDER BY type_name ASC");
 $docTypes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch all users for recipients
+// ---- Fetch recipients ----
 $stmt = $pdo->prepare("SELECT user_id, username FROM users WHERE user_id != ? ORDER BY username ASC");
 $stmt->execute([$userId]);
 $allUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch departments for recipients
 $stmt = $pdo->query("SELECT department_id, department_name FROM departments ORDER BY department_name ASC");
 $allDepartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Batch fetch data
+// ---- Batch queries ----
 $queries = [
-    // Recent files
+    // recent files
     [
         'sql' => "
-            SELECT f.file_id, f.file_name, f.upload_date, f.copy_type, dt.type_name AS document_type
+            SELECT f.file_id, f.file_name, f.upload_date, f.copy_type, dt.type_name AS document_type, f.file_path
             FROM files f
             LEFT JOIN document_types dt ON f.document_type_id = dt.document_type_id
             WHERE f.user_id = ? AND f.file_status != 'deleted'
@@ -88,7 +85,7 @@ $queries = [
             LIMIT 5",
         'params' => [$userId]
     ],
-    // Notifications
+    // notifications
     [
         'sql' => "
             SELECT t.transaction_id AS id, t.file_id, t.transaction_status, t.transaction_time AS timestamp, 
@@ -99,7 +96,7 @@ $queries = [
             ORDER BY t.transaction_time DESC",
         'params' => [$userId]
     ],
-    // Activity logs
+    // activity logs
     [
         'sql' => "
             SELECT t.transaction_id, t.description AS action, t.transaction_time AS timestamp
@@ -109,10 +106,10 @@ $queries = [
             LIMIT 10",
         'params' => [$userId]
     ],
-    // All uploaded files
+    // uploaded files
     [
         'sql' => "
-            SELECT f.file_id, f.file_name, f.upload_date, f.copy_type, dt.type_name AS document_type, f.file_type, f.file_size, d.department_name
+            SELECT f.file_id, f.file_name, f.upload_date, f.copy_type, dt.type_name AS document_type, f.file_type, f.file_size, d.department_name, f.file_path
             FROM files f
             LEFT JOIN document_types dt ON f.document_type_id = dt.document_type_id
             LEFT JOIN departments d ON f.department_id = d.department_id
@@ -120,11 +117,11 @@ $queries = [
             ORDER BY f.upload_date DESC",
         'params' => [$userId]
     ],
-    // Files sent to me
+    // received files
     [
         'sql' => "
             SELECT DISTINCT f.file_id, f.file_name, f.upload_date, f.copy_type, dt.type_name AS document_type, f.file_type, f.file_size,
-                           u.username AS sender_username
+                           u.username AS sender_username, f.file_path
             FROM files f
             JOIN transactions t ON f.file_id = t.file_id
             LEFT JOIN document_types dt ON f.document_type_id = dt.document_type_id
@@ -141,20 +138,21 @@ foreach ($queries as $index => $query) {
         $stmt = $pdo->prepare($query['sql']);
         $stmt->execute($query['params']);
         $results[$index] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("Query $index returned " . count($results[$index]) . " rows");
     } catch (PDOException $e) {
         error_log("Query $index failed: " . $e->getMessage());
         $results[$index] = [];
     }
 }
 
-$recentFiles = $results[0] ?? [];
+$recentFiles   = $results[0] ?? [];
 $notifications = $results[1] ?? [];
-$activityLogs = $results[2] ?? [];
+$activityLogs  = $results[2] ?? [];
 $filesUploaded = $results[3] ?? [];
 $filesReceived = $results[4] ?? [];
 
 ?>
+<!-- ---- Rest of your HTML (unchanged) ---- -->
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -168,6 +166,59 @@ $filesReceived = $results[4] ?? [];
     <link rel="stylesheet" href="style/client-sidebar.css">
     <link rel="stylesheet" href="style/dashboard.css">
     <meta name="csrf-token" content="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
+    <style>
+        .file-preview-sidebar {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100%;
+            background: #fff;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .file-preview-sidebar.active {
+            right: 0;
+        }
+        .file-preview-sidebar .close-preview {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        .file-preview-sidebar h3 {
+            margin: 0 0 20px;
+            font-size: 1.5em;
+        }
+        .file-preview-sidebar .preview-content img,
+        .file-preview-sidebar .preview-content iframe {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        .file-preview-sidebar .metadata {
+            font-size: 0.9em;
+        }
+        .file-preview-sidebar .metadata p {
+            margin: 5px 0;
+        }
+        .file-preview-sidebar .no-preview {
+            color: #666;
+            font-style: italic;
+        }
+        .file-item {
+            cursor: pointer;
+        }
+        .file-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
 </head>
 
 <body>
@@ -226,7 +277,6 @@ $filesReceived = $results[4] ?? [];
                             <div class="notification-actions">
                                 <button class="accept-file">Accept</button>
                                 <button class="deny-file">Deny</button>
-                            </div>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -315,7 +365,24 @@ $filesReceived = $results[4] ?? [];
                         <!-- Populated via JavaScript -->
                     </div>
                     <div id="receivedTab" class="tab-content files-grid grid-view hidden">
-                        <!-- Populated via JavaScript -->
+                        <?php if (empty($filesReceived)): ?>
+                            <p class="no-files">No files received.</p>
+                        <?php else: ?>
+                            <?php foreach ($filesReceived as $file): ?>
+                                <div class="file-item" data-file-id="<?= htmlspecialchars($file['file_id']) ?>">
+                                    <p class="file-name"><?= htmlspecialchars($file['file_name']) ?></p>
+                                    <p class="file-meta">
+                                        Type: <?= htmlspecialchars($file['document_type'] ?? 'Unknown') ?> | 
+                                        Uploaded: <?= date('M d, Y', strtotime($file['upload_date'])) ?> | 
+                                        Sender: <?= htmlspecialchars($file['sender_username'] ?? 'Unknown') ?>
+                                    </p>
+                                    <button class="kebab-menu"><i class="fas fa-ellipsis-v"></i></button>
+                                    <div class="file-menu hidden">
+                                        <button class="download-file">Download</button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
             </section>
             <div id="activityLogModal" class="modal hidden">
@@ -467,6 +534,21 @@ $filesReceived = $results[4] ?? [];
                     </div>
                 </div>
             </div>
+            <div id="filePreviewSidebar" class="file-preview-sidebar hidden">
+                <button class="close-preview" aria-label="Close Preview"><i class="fas fa-times"></i></button>
+                <h3>File Preview</h3>
+                <div class="preview-content"></div>
+                <div class="metadata">
+                    <p><strong>File Name:</strong> <span id="previewFileName"></span></p>
+                    <p><strong>Document Type:</strong> <span id="previewDocumentType"></span></p>
+                    <p><strong>Upload Date:</strong> <span id="previewUploadDate"></span></p>
+                    <p><strong>File Type:</strong> <span id="previewFileType"></span></p>
+                    <p><strong>File Size:</strong> <span id="previewFileSize"></span></p>
+                    <p><strong>Department:</strong> <span id="previewDepartment"></span></p>
+                    <p><strong>Copy Type:</strong> <span id="previewCopyType"></span></p>
+                </div>
+                <div id="previewError" class="no-preview" style="display:none;"></div>
+            </div>
             <?php include 'templates/file_info_sidebar.php'; ?>
         </main>
     </div>
@@ -554,6 +636,77 @@ $filesReceived = $results[4] ?? [];
                         document.getElementById('error').innerText = `Error scanning file: ${err}`;
                     });
             }
+        });
+
+        // File Preview Logic
+        const filePreviewSidebar = document.getElementById('filePreviewSidebar');
+        const closePreviewButton = document.querySelector('.close-preview');
+        const previewContent = document.querySelector('.file-preview-sidebar .preview-content');
+        const previewError = document.getElementById('previewError');
+
+        // Close preview sidebar
+        closePreviewButton.addEventListener('click', () => {
+            filePreviewSidebar.classList.remove('active');
+            previewError.style.display = 'none';
+        });
+
+        // Handle file item click for preview
+        document.querySelectorAll('.file-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                // Prevent preview when clicking kebab menu
+                if (e.target.closest('.kebab-menu') || e.target.closest('.file-menu')) {
+                    return;
+                }
+
+                const fileId = item.dataset.fileId;
+                previewError.style.display = 'none';
+                filePreviewSidebar.classList.add('active');
+
+                // Fetch file details via AJAX
+                try {
+                    const response = await fetch(`get_file_details.php?file_id=${fileId}`, {
+                        headers: {
+                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                        }
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const file = await response.json();
+
+                    if (file.error) {
+                        throw new Error(file.error);
+                    }
+
+                    // Populate metadata
+                    document.getElementById('previewFileName').textContent = file.file_name || 'Unknown';
+                    document.getElementById('previewDocumentType').textContent = file.document_type || 'Unknown';
+                    document.getElementById('previewUploadDate').textContent = file.upload_date ? new Date(file.upload_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown';
+                    document.getElementById('previewFileType').textContent = file.file_type || 'Unknown';
+                    document.getElementById('previewFileSize').textContent = file.file_size ? `${(file.file_size / 1024).toFixed(2)} KB` : 'Unknown';
+                    document.getElementById('previewDepartment').textContent = file.department_name || 'None';
+                    document.getElementById('previewCopyType').textContent = file.copy_type || 'Unknown';
+
+                    // Display file preview
+                    previewContent.innerHTML = '';
+                    if (file.file_type && file.file_path) {
+                        if (file.file_type.startsWith('image/')) {
+                            previewContent.innerHTML = `<img src="${file.file_path}" alt="File preview" style="max-height: 300px;">`;
+                        } else if (file.file_type === 'application/pdf') {
+                            previewContent.innerHTML = `<iframe src="${file.file_path}" style="width:100%; height:300px;" frameborder="0"></iframe>`;
+                        } else {
+                            previewContent.innerHTML = '<p class="no-preview">Preview not available for this file type.</p>';
+                        }
+                    } else {
+                        previewContent.innerHTML = '<p class="no-preview">No preview available.</p>';
+                    }
+                } catch (error) {
+                    console.error('Preview error:', error);
+                    previewContent.innerHTML = '';
+                    previewError.textContent = `Failed to load preview: ${error.message}. Check console for details.`;
+                    previewError.style.display = 'block';
+                }
+            });
         });
     </script>
 </body>
