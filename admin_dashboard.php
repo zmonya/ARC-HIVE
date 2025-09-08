@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 error_reporting(E_ALL);
-ini_set('display_errors', '0'); 
+ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 
 session_start();
@@ -12,15 +12,19 @@ header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
 header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 
-function validate_session(): void {
+// Validate session and authentication
+function validate_session(): void
+{
     if (!isset($_SESSION['user_id'], $_SESSION['role'])) {
         header('Location: login.php');
         exit();
     }
+
     if ($_SESSION['role'] !== 'admin') {
         header('Location: unauthorized.php');
         exit();
     }
+
     $userId = filter_var($_SESSION['user_id'], FILTER_VALIDATE_INT);
     if ($userId === false) {
         session_destroy();
@@ -28,21 +32,63 @@ function validate_session(): void {
         exit();
     }
 }
+
 validate_session();
 
 // Database connection
 $host = '127.0.0.1';
 $dbname = 'arc-hive-mainDB';
-$username = 'root';
-$password = '';
-$dsn = "mysql:host=$host;dbname=$dbname;charset=utf8mb4";
-$options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
-$pdo = new PDO($dsn, $username, $password, $options);
+$username = 'root'; // Change to your DB user
+$password = ''; // Change to your DB password
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    error_log("Database connection failed: " . $e->getMessage());
+    die("Database connection failed: " . $e->getMessage());
+}
+
+// CSRF protection functions
+function generateCsrfToken(): string
+{
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function validateCsrfToken(string $token): bool
+{
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+// Database query execution with error handling
+function executeQuery(PDO $pdo, string $query, array $params = []): PDOStatement
+{
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        return $stmt;
+    } catch (PDOException $e) {
+        error_log("Database error in executeQuery: " . $e->getMessage());
+        throw new RuntimeException("Database operation failed", 0, $e);
+    }
+}
+
+// Sanitize output
+function sanitizeOutput(?string $data): string
+{
+    return htmlspecialchars($data ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+}
 
 // Fetch admin details
 try {
-    $adminStmt = $pdo->prepare("SELECT user_id, username, role FROM users WHERE user_id = ?");
-    $adminStmt->execute([$_SESSION['user_id']]);
+    $adminStmt = executeQuery(
+        $pdo,
+        "SELECT user_id, username, role FROM users WHERE user_id = ?",
+        [$_SESSION['user_id']]
+    );
     $admin = $adminStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$admin) {
@@ -65,8 +111,7 @@ $statisticsQueries = [
 $stats = [];
 foreach ($statisticsQueries as $key => $query) {
     try {
-        $stmt = $pdo->prepare($query);
-        $stmt->execute();
+        $stmt = executeQuery($pdo, $query);
         $stats[$key] = $stmt->fetchColumn() ?: 0;
     } catch (Exception $e) {
         error_log("Error fetching statistic {$key}: " . $e->getMessage());
@@ -79,8 +124,7 @@ foreach ($statisticsQueries as $key => $query) {
 function fetchData(PDO $pdo, string $query, array $params = []): array
 {
     try {
-        $stmt = $pdo->prepare($query);
-        $stmt->execute($params);
+        $stmt = executeQuery($pdo, $query, $params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Exception $e) {
         error_log("Error fetching data: " . $e->getMessage());
@@ -159,7 +203,7 @@ $reportData = [
 ] = $reportData;
 
 // Generate CSRF token
-$csrfToken = bin2hex(random_bytes(16));
+$csrfToken = generateCsrfToken();
 
 // Generate CSV
 function generateCSV($data, $report) {
@@ -177,149 +221,10 @@ function generateCSV($data, $report) {
     exit;
 }
 
-// Generate PDF using TCPDF
-function generatePDF($chartType, $data, $title) {
-    try {
-        if (!file_exists('vendor/tecnickcom/tcpdf/tcpdf.php')) {
-            error_log("TCPDF library not found at vendor/tecnickcom/tcpdf/tcpdf.php");
-            header('HTTP/1.1 500 Internal Server Error');
-            echo "Error: TCPDF library not found.";
-            exit;
-        }
-        require_once('vendor/tecnickcom/tcpdf/tcpdf.php');
-
-        while (ob_get_level()) ob_end_clean();
-
-        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-        
-        $pdf->SetPrintHeader(false);
-        $pdf->SetPrintFooter(false);
-        
-        $pdf->SetCreator(PDF_CREATOR);
-        $pdf->SetAuthor('ArcHive');
-        $pdf->SetTitle($title . ' Report');
-        $pdf->SetSubject('Report generated from ArcHive Dashboard');
-        
-        $pdf->SetMargins(15, 15, 15);
-        $pdf->SetAutoPageBreak(TRUE, 15);
-        
-        $pdf->SetFont('helvetica', '', 10);
-        
-        $pdf->AddPage();
-        
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->Cell(0, 10, $title, 0, 1, 'C');
-        
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 10, 'Generated on: ' . date('F j, Y, g:i A'), 0, 1, 'C');
-        
-        error_log("PDF data for $title: " . print_r($data, true));
-
-        if (empty($data)) {
-            $pdf->Write(0, 'No data available.', '', 0, 'C');
-        } else {
-            $header = array_keys($data[0]);
-
-            $pdf->SetFillColor(80, 200, 120);
-            $pdf->SetTextColor(255, 255, 255);
-            $cellWidth = 180 / count($header);
-
-            foreach ($header as $col) {
-                $label = ucwords(str_replace('_', ' ', $col));
-                $pdf->MultiCell($cellWidth, 7, $label, 1, 'C', 1, 0, '', '', true, 0, false, true, 7, 'M');
-            }
-            $pdf->Ln();
-
-            $pdf->SetFillColor(255, 255, 255);
-            $pdf->SetTextColor(0, 0, 0);
-            $fill = 0;
-            foreach ($data as $row) {
-                foreach ($header as $col) {
-                    $value = $row[$col] ?? 'N/A';
-                    if (in_array($col, ['upload_date', 'transaction_time', 'time']) && !empty($value)) {
-                        $value = date('Y-m-d H:i:s', strtotime($value));
-                    }
-                    $pdf->MultiCell($cellWidth, 6, $value, 1, 'L', $fill, 0, '', '', true, 0, false, true, 6, 'M');
-                }
-                $pdf->Ln();
-                $fill = !$fill;
-            }
-        }
-        
-        $pdf->Output($title . '_Report_' . date('YmdHis') . '.pdf', 'D');
-    } catch (Exception $e) {
-        error_log("PDF generation error: " . $e->getMessage());
-        header('HTTP/1.1 500 Internal Server Error');
-        echo "Error generating PDF: " . htmlspecialchars($e->getMessage());
-        exit;
-    }
-}
-
-// Generate Word using PHPWord
-function generateWord($data, $report) {
-    try {
-        if (!file_exists('vendor/autoload.php')) {
-            error_log("PHPWord autoload not found at vendor/autoload.php");
-            header('HTTP/1.1 500 Internal Server Error');
-            echo "Error: PHPWord library not found.";
-            exit;
-        }
-        require_once 'vendor/autoload.php';
-
-        while (ob_get_level()) ob_end_clean();
-
-        $phpWord = new \PhpOffice\PhpWord\PhpWord();
-        $section = $phpWord->addSection();
-        $table = $section->addTable();
-
-        $header = array_keys($data[0]);
-
-        $table->addRow();
-        foreach ($header as $col) {
-            $label = ucwords(str_replace('_', ' ', $col));
-            $table->addCell(2000)->addText($label, ['bold' => true], ['alignment' => 'center']);
-        }
-
-        error_log("Word data for $report: " . print_r($data, true));
-
-        if (empty($data)) {
-            $section->addText('No data available.');
-        } else {
-            foreach ($data as $row) {
-                $table->addRow();
-                foreach ($header as $col) {
-                    $value = $row[$col] ?? 'N/A';
-                    if (in_array($col, ['upload_date', 'transaction_time', 'time']) && !empty($value)) {
-                        $value = date('Y-m-d H:i:s', strtotime($value));
-                    }
-                    $table->addCell(2000)->addText($value);
-                }
-            }
-        }
-
-        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        header('Content-Disposition: attachment;filename="' . $report . '_Report_' . date('YmdHis') . '.docx"');
-        header('Cache-Control: no-cache, no-store, must-revalidate');
-        header('Pragma: no-cache');
-        header('Expires: 0');
-
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
-        $writer->save('php://output');
-        exit;
-    } catch (Exception $e) {
-        error_log("Word generation error: " . $e->getMessage());
-        header('HTTP/1.1 500 Internal Server Error');
-        echo "Error generating Word: " . htmlspecialchars($e->getMessage());
-        exit;
-    }
-}
-
-// Handle CSV, PDF, and Word downloads
-if (isset($_GET['download']) && isset($_GET['report'])) {
+// Handle CSV download
+if (isset($_GET['download']) && $_GET['download'] === 'csv' && isset($_GET['report'])) {
     $report = $_GET['report'];
     $data = [];
-
-    // Select which dataset to export
     switch ($report) {
         case 'FileUploadTrends':
             $data = $fileUploadTrendsTable;
@@ -342,84 +247,14 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
         case 'AccessHistory':
             $data = $accessHistory;
             break;
-        default:
-            error_log("Invalid report type: $report");
-            die("Invalid report type.");
     }
-
-    // CSV
-    if ($_GET['download'] === 'csv') {
-        if (!empty($data)) {
-            generateCSV($data, $report);
-        } else {
-            error_log("No data available for CSV download: $report");
-            die("No data available for download.");
-        }
-
-    // PDF
-    } elseif ($_GET['download'] === 'pdf') {
-        error_log("Attempting PDF for $report with data count: " . count($data));
-        if (!empty($data)) {
-            generatePDF($report, $data, $report);
-        } else {
-            error_log("No data available for PDF download: $report");
-            die("No data available for download.");
-        }
-
-    // Word
-    } elseif ($_GET['download'] === 'word') {
-        require_once __DIR__ . '/vendor/autoload.php';
-
-        if (empty($data)) {
-            error_log("No data available for Word download: $report");
-            die("No data available for download.");
-        }
-
-        $phpWord = new \PhpOffice\PhpWord\PhpWord();
-        $section = $phpWord->addSection();
-
-        // Title
-        $section->addText("Report: " . htmlspecialchars($report), ['bold' => true, 'size' => 16]);
-
-        // Table
-        $table = $section->addTable();
-
-        // Header row
-        $headers = array_keys($data[0]);
-        $table->addRow();
-        foreach ($headers as $header) {
-            $table->addCell(3000)->addText($header, ['bold' => true]);
-        }
-
-        // Data rows
-        foreach ($data as $row) {
-            $table->addRow();
-            foreach ($row as $cell) {
-                $table->addCell(3000)->addText((string)$cell);
-            }
-        }
-
-        // Clean output buffer before sending file
-        if (ob_get_length()) {
-            ob_end_clean();
-        }
-
-        // Output Word file
-        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        header('Content-Disposition: attachment;filename="' . $report . '.docx"');
-        header('Cache-Control: max-age=0');
-
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
-        $writer->save('php://output');
-        exit();
-
-    // Invalid format
+    if (!empty($data)) {
+        generateCSV($data, $report);
     } else {
-        error_log("Invalid download format for report: $report");
-        die("Invalid download format.");
+        error_log("No data available for CSV download: $report");
+        die("No data available for download.");
     }
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -439,14 +274,13 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
-    <script src="lib/chart.js"></script>
-    <script src="lib/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body class="admin-dashboard">
     <?php include 'admin_menu.php'; ?>
 
     <div class="top-nav">
-        <h2>Welcome, <?= htmlspecialchars($admin['username']) ?>!</h2>
+        <h2>Welcome, <?= sanitizeOutput($admin['username']) ?>!</h2>
         <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
             <i class="fas fa-bars"></i>
         </button>
@@ -454,7 +288,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
 
     <div class="main-content">
         <?php if (isset($errorMessage)): ?>
-            <div class="error-message"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($errorMessage) ?></div>
+            <div class="error-message"><i class="fas fa-exclamation-circle"></i> <?= sanitizeOutput($errorMessage) ?></div>
         <?php endif; ?>
 
         <!-- Statistics Cards -->
@@ -483,11 +317,6 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                 <i class="fas fa-history"></i>
                 <h3>File Activity (7 Days)</h3>
                 <p><?= $stats['fileActivity'] ?></p>
-            </div>
-            <div class="stat-card">
-                <i class="fas fa-user"></i>
-                <h3>Activity logs </h3>
-                <p><?= $stats['Activity_logs'] ?></p>
             </div>
         </div>
 
@@ -588,23 +417,15 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
         <!-- Modal for Download Format -->
         <div class="modal-overlay" id="downloadFormatModal" role="dialog" aria-labelledby="downloadModalTitle" style="display: none;">
             <div class="modal-content">
-                <button class="modal-close" onclick="closeDownloadModal()" aria-label="Close Download Modal">
-                    <i class="fas fa-times"></i>
-                </button>
+                <button class="modal-close" onclick="closeDownloadModal()" aria-label="Close Download Modal"><i class="fas fa-times"></i></button>
                 <h3 id="downloadModalTitle">Select Download Format</h3>
                 <div class="download-options">
-                    <button onclick="downloadReport(currentChartType, 'csv')">
-                        <i class="fas fa-file-csv"></i> Download as CSV
-                    </button>
-                    <button onclick="downloadReport(currentChartType, 'pdf')">
-                        <i class="fas fa-file-pdf"></i> Download as PDF
-                    </button>
-                    <button onclick="downloadReport(currentChartType, 'word')">
-                        <i class="fas fa-file-word"></i> Download as Word
-                    </button>
+                    <button onclick="downloadReport(currentChartType, 'csv')"><i class="fas fa-file-csv"></i> Download as CSV</button>
+                    <button onclick="downloadReport(currentChartType, 'pdf')"><i class="fas fa-file-pdf"></i> Download as PDF</button>
                 </div>
             </div>
         </div>
+    </div>
 
     <!-- Pass PHP data to JavaScript -->
     <script>
@@ -771,24 +592,24 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
             return chart;
         };
 
-        // Table Generation for Modal and Print
-        const generateTableContent = (chartType, page = 1, itemsPerPage = 5, forPrint = false) => {
+        // Table Generation for Modal and PDF
+        const generateTableContent = (chartType, page = 1, itemsPerPage = 5, forPdf = false) => {
             const dataKey = chartType === 'FileUploadTrends' ? 'FileUploadTrendsTable' : chartType;
             const data = dashboardData[dataKey] || [];
             if (!data.length) return '<p class="no-data">No data available.</p>';
 
-            const start = forPrint ? 0 : (page - 1) * itemsPerPage;
-            const end = forPrint ? data.length : (itemsPerPage === 'all' ? data.length : start + itemsPerPage);
+            const start = forPdf ? 0 : (page - 1) * itemsPerPage;
+            const end = forPdf ? data.length : (itemsPerPage === 'all' ? data.length : start + itemsPerPage);
             const slicedData = data.slice(start, end);
 
             const tableHeaders = {
-                FileUploadTrends: ['File ID', 'File Name', 'Upload Date', 'Uploader', 'Department Name', 'Document Type'],
-                FileDistribution: ['Department Name', 'File Count'],
-                UsersPerDepartment: ['Department Name', 'User Count'],
+                FileUploadTrends: ['File ID', 'File Name', 'Upload Date', 'Uploader', 'Department', 'Document Type'],
+                FileDistribution: ['Department', 'File Count'],
+                UsersPerDepartment: ['Department', 'User Count'],
                 DocumentCopies: ['File Name', 'Copy Count', 'Offices with Copy'],
-                PendingRequests: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department Name'],
-                RetrievalHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department Name'],
-                AccessHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department Name']
+                PendingRequests: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department'],
+                RetrievalHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department'],
+                AccessHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department']
             };
 
             const headers = tableHeaders[chartType] || [];
@@ -853,7 +674,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
             `;
         };
 
-        // Generate Report Content for Print
+        // Generate Report Content for Print and PDF
         const generateReportContent = (chartType) => {
             const reportContent = generateTableContent(chartType, 1, 'all', true);
             const canvas = document.getElementById(`${chartType}Chart`);
@@ -878,8 +699,8 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                         <style>
                             body { 
                                 font-family: 'Inter', Arial, sans-serif; 
-                                margin: 0.3in auto;
-                                padding: 0 0.5in;
+                                margin: 0.3in auto; /* Centered with equal top/bottom margins */
+                                padding: 0 0.5in; /* Equal left/right padding */
                                 color: #2d3748; 
                                 line-height: 1.4;
                                 background-color: #ffffff;
@@ -918,7 +739,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                                 width: 450px; 
                                 height: auto;
                                 display: block; 
-                                margin: 0 auto 15px auto;
+                                margin: 0 auto 15px auto; /* Centered with adjusted margins */
                                 border: 1px solid #e2e8f0;
                                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                             }
@@ -926,14 +747,14 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                                 width: 100%; 
                                 max-width: 750px; 
                                 border-collapse: collapse; 
-                                margin: 10px auto;
+                                margin: 10px auto; /* Centered table */
                                 font-size: 8pt; 
                                 background-color: #ffffff; 
                                 box-shadow: 0 2px 6px rgba(0,0,0,0.05); 
                             }
                             th, td { 
                                 border: 1px solid #e2e8f0; 
-                                padding: 6px 8px;
+                                padding: 6px 8px; /* Slightly increased padding for better spacing */
                                 text-align: left; 
                                 word-wrap: break-word; 
                             }
@@ -943,7 +764,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                                 font-weight: 500; 
                                 text-transform: uppercase; 
                                 font-size: 7pt;
-                                text-align: center;
+                                text-align: center; /* Center table headers */
                             }
                             td { 
                                 color: #2d3748; 
@@ -964,7 +785,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                             }
                             @media print {
                                 body { 
-                                    margin: 0.3in auto;
+                                    margin: 0.3in auto; /* Centered margins for print */
                                     padding: 0 0.5in;
                                     -webkit-print-color-adjust: exact; 
                                     print-color-adjust: exact;
@@ -976,7 +797,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                                 }
                                 table { 
                                     font-size: 7pt; 
-                                    margin: 10px auto;
+                                    margin: 10px auto; /* Ensure table is centered */
                                 }
                                 th { 
                                     background-color: #50c878 !important; 
@@ -993,7 +814,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                                     max-width: 100% !important;
                                     width: 450px !important;
                                     height: auto !important;
-                                    margin: 0 auto 15px auto !important;
+                                    margin: 0 auto 15px auto !important; /* Centered for print */
                                 }
                             }
                         </style>
@@ -1023,7 +844,7 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
             };
         };
 
-        // Download Report as CSV, PDF, or Word
+        // Download Report as CSV or PDF
         const downloadReport = (chartType, format) => {
             const dataKey = chartType === 'FileUploadTrends' ? 'FileUploadTrendsTable' : chartType;
             const data = dashboardData[dataKey] || [];
@@ -1035,13 +856,13 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
 
             if (format === 'csv') {
                 const headers = {
-                    FileUploadTrends: ['File ID', 'File Name', 'Upload Date', 'Uploader', 'Department Name', 'Document Type'],
-                    FileDistribution: ['Department Name', 'File Count'],
-                    UsersPerDepartment: ['Department Name', 'User Count'],
+                    FileUploadTrends: ['File ID', 'File Name', 'Upload Date', 'Uploader', 'Department', 'Document Type'],
+                    FileDistribution: ['Department', 'File Count'],
+                    UsersPerDepartment: ['Department', 'User Count'],
                     DocumentCopies: ['File Name', 'Copy Count', 'Offices with Copy'],
-                    PendingRequests: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department Name'],
-                    RetrievalHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department Name'],
-                    AccessHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department Name']
+                    PendingRequests: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department'],
+                    RetrievalHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department'],
+                    AccessHistory: ['Transaction ID', 'Time', 'Username', 'File Name', 'Department']
                 };
 
                 let csvContent = headers[chartType].map(escapeCsvField).join(',') + '\n';
@@ -1106,15 +927,51 @@ if (isset($_GET['download']) && isset($_GET['report'])) {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             } else if (format === 'pdf') {
-                window.location.href = `?download=pdf&report=${chartType}`;
-            } else if (format === 'word') {
-                window.location.href = `?download=word&report=${chartType}`;
+                const reportContent = generateReportContent(chartType);
+                const pdfWindow = window.open('about:blank', '_blank');
+                pdfWindow.document.write(reportContent);
+                pdfWindow.document.close();
+
+                pdfWindow.onload = () => {
+                    const opt = {
+                        margin: [0.3, 0.5, 0.5, 0.5], // Adjusted: [top, right, bottom, left] in inches
+                        filename: `${chartType}_Report_${new Date().toISOString().replace(/[-:T.]/g, '')}.pdf`,
+                        image: { type: 'png', quality: 1.0 },
+                        html2canvas: { 
+                            scale: 2, 
+                            useCORS: true,
+                            width: 816, // 8.5in at 96dpi
+                            windowWidth: 816
+                        },
+                        jsPDF: { 
+                            unit: 'in', 
+                            format: 'letter', 
+                            orientation: 'portrait',
+                            putOnlyUsedFonts: true
+                        }
+                    };
+
+                    try {
+                        html2pdf().from(pdfWindow.document.body).set(opt).save().then(() => {
+                            console.log('PDF generated successfully for', chartType);
+                            setTimeout(() => {
+                                pdfWindow.close();
+                            }, 500);
+                        }).catch(error => {
+                            console.error('PDF generation error:', error);
+                            alert('Error generating PDF: ' + error.message);
+                            pdfWindow.close();
+                        });
+                    } catch (error) {
+                        console.error('PDF generation error:', error);
+                        alert('Error generating PDF: ' + error.message);
+                        pdfWindow.close();
+                    }
+                };
             } else {
                 alert('Invalid format selected.');
             }
             closeDownloadModal();
-
-            
         };
 
         // Sidebar Toggle
